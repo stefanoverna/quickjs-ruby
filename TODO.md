@@ -4,7 +4,55 @@ This document tracks remaining work to make quickjs-ruby production-ready.
 
 ## Critical Issues
 
-### 1. Fix GC Assertion in Fetch Tests
+### 1. Fix RuboCop Linting Failures
+**Priority: High**
+**Status: Not Started**
+
+RuboCop linting is currently failing. Need to run and fix all linting issues.
+
+**Tasks:**
+- [ ] Run RuboCop: `/opt/rbenv/versions/3.3.6/lib/ruby/gems/3.3.0/gems/rubocop-*/exe/rubocop`
+- [ ] Fix or disable failing rules
+- [ ] Ensure CI linting passes
+
+**Files Likely Affected:**
+- Ruby files in `lib/quickjs/`
+- Test files in `test/`
+- `Rakefile`
+
+---
+
+### 2. Fix Failing Tests
+**Priority: High**
+**Status: Not Started**
+
+Test suite is currently failing. Need to investigate and fix all test failures.
+
+**Tasks:**
+- [ ] Compile the native extension
+- [ ] Run test suite to identify failures
+- [ ] Fix failing tests one by one
+- [ ] Ensure all tests pass on Ruby 3.3
+- [ ] Test on other Ruby versions (2.7, 3.0, 3.1, 3.2)
+
+**Possible Issues:**
+- Native extension compilation errors
+- API differences between MicroQuickJS and QuickJS
+- Memory limit adjustments needed (100KB min vs 10KB)
+- ES6+ syntax in test expectations
+
+**How to Run Tests:**
+```bash
+cd ext/quickjs
+ruby extconf.rb
+make
+cd ../..
+ruby -Ilib test/run_all_tests.rb  # or similar
+```
+
+---
+
+### 3. Fix GC Assertion in Fetch Tests
 **Priority: Medium**
 **Status: Known Issue**
 
