@@ -69,6 +69,7 @@ ext/quickjs/quickjs.c
 ext/quickjs/libregexp.c
 ext/quickjs/libunicode.c
 ext/quickjs/cutils.c
+ext/quickjs/libbf.c
 ext/quickjs/*.h
 !ext/quickjs/extconf.rb
 !ext/quickjs/quickjs_ext.c

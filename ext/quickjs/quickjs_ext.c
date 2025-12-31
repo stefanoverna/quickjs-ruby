@@ -192,33 +192,30 @@ static JSValue js_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     }
 
     // Parse options (second argument)
-    const char *method = "GET";
-    const char *body = NULL;
+    const char *method_str = NULL;
+    const char *body_str = NULL;
     VALUE rb_headers = rb_hash_new();
 
     if (argc >= 2 && !JS_IsUndefined(argv[1]) && !JS_IsNull(argv[1])) {
         // Get method
         JSValue method_val = JS_GetPropertyStr(ctx, argv[1], "method");
         if (!JS_IsUndefined(method_val) && !JS_IsNull(method_val)) {
-            const char *method_str = JS_ToCString(ctx, method_val);
-            if (method_str) {
-                method = method_str;
-            }
-            JS_FreeValue(ctx, method_val);
+            method_str = JS_ToCString(ctx, method_val);
         }
+        JS_FreeValue(ctx, method_val);
 
         // Get body
         JSValue body_val = JS_GetPropertyStr(ctx, argv[1], "body");
         if (!JS_IsUndefined(body_val) && !JS_IsNull(body_val)) {
-            body = JS_ToCString(ctx, body_val);
+            body_str = JS_ToCString(ctx, body_val);
         }
         JS_FreeValue(ctx, body_val);
     }
 
     // Call Ruby HTTP executor with exception protection
     VALUE rb_url = rb_str_new2(url);
-    VALUE rb_method = rb_str_new2(method);
-    VALUE rb_body = body ? rb_str_new2(body) : Qnil;
+    VALUE rb_method = method_str ? rb_str_new2(method_str) : rb_str_new2("GET");
+    VALUE rb_body = body_str ? rb_str_new2(body_str) : Qnil;
 
     struct http_callback_args args = {
         .callback = wrapper->rb_http_callback,
@@ -233,8 +230,8 @@ static JSValue js_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 
     // Free C strings
     JS_FreeCString(ctx, url);
-    if (method != "GET") JS_FreeCString(ctx, method);
-    if (body) JS_FreeCString(ctx, body);
+    if (method_str) JS_FreeCString(ctx, method_str);
+    if (body_str) JS_FreeCString(ctx, body_str);
 
     // Check if an exception was raised
     if (state) {
@@ -276,8 +273,6 @@ static JSValue ruby_to_js(JSContext *ctx, VALUE rb_val);
 
 // Convert JavaScript value to Ruby value
 static VALUE js_to_ruby(JSContext *ctx, JSValue val) {
-    int tag = JS_VALUE_GET_TAG(val);
-
     // Null
     if (JS_IsNull(val)) {
         return Qnil;
@@ -503,14 +498,32 @@ static JSValue ruby_to_js(JSContext *ctx, VALUE rb_val) {
 static void sandbox_free(void *ptr) {
     ContextWrapper *wrapper = (ContextWrapper *)ptr;
     if (wrapper) {
-        if (wrapper->ctx) {
+        if (wrapper->ctx && wrapper->rt) {
+            // Get the global object
+            JSValue global = JS_GetGlobalObject(wrapper->ctx);
+
+            // Manually set console and fetch to undefined to release C function references
+            // This is necessary because CFunctions hold references that prevent GC cleanup
+            JS_SetPropertyStr(wrapper->ctx, global, "console", JS_UNDEFINED);
+            JS_SetPropertyStr(wrapper->ctx, global, "fetch", JS_UNDEFINED);
+
+            // Free the global object reference
+            JS_FreeValue(wrapper->ctx, global);
+
+            // Run garbage collection to clean up
+            JS_RunGC(wrapper->rt);
+
+            // Free context first
             JS_FreeContext(wrapper->ctx);
+            wrapper->ctx = NULL;
         }
         if (wrapper->rt) {
             JS_FreeRuntime(wrapper->rt);
+            wrapper->rt = NULL;
         }
         if (wrapper->console_output) {
             free(wrapper->console_output);
+            wrapper->console_output = NULL;
         }
         free(wrapper);
     }
@@ -545,7 +558,7 @@ static VALUE sandbox_initialize(VALUE self, VALUE options) {
     VALUE rb_timeout = rb_hash_aref(options, ID2SYM(rb_intern("timeout_ms")));
     VALUE rb_console_max = rb_hash_aref(options, ID2SYM(rb_intern("console_log_max_size")));
 
-    wrapper->mem_limit = NIL_P(rb_mem_limit) ? 50000 : NUM2SIZET(rb_mem_limit);
+    wrapper->mem_limit = NIL_P(rb_mem_limit) ? 1000000 : NUM2SIZET(rb_mem_limit);
     wrapper->timeout_ms = NIL_P(rb_timeout) ? 5000 : NUM2LL(rb_timeout);
     wrapper->console_max_size = NIL_P(rb_console_max) ? 10000 : NUM2SIZET(rb_console_max);
     wrapper->rb_http_callback = Qnil;
@@ -682,9 +695,14 @@ static VALUE sandbox_eval(VALUE self, VALUE code) {
     VALUE rb_result = js_to_ruby(wrapper->ctx, result);
     JS_FreeValue(wrapper->ctx, result);
 
+    // Run garbage collection to clean up any temporary objects created during evaluation
+    // This is especially important for fetch() responses and other complex objects
+    JS_RunGC(wrapper->rt);
+
     // Return Result object
-    VALUE argv[3] = { rb_result, console_output, console_truncated };
-    return rb_class_new_instance(3, argv, rb_cResult);
+    VALUE rb_http_requests = rb_ary_new();  // Empty array for HTTP requests (tracked by Ruby layer)
+    VALUE argv[4] = { rb_result, console_output, console_truncated, rb_http_requests };
+    return rb_class_new_instance(4, argv, rb_cResult);
 }
 
 // Set a global variable
@@ -735,7 +753,6 @@ void Init_quickjs_native(void) {
     rb_cResult = rb_const_get(rb_cQuickJS, rb_intern("Result"));
 
     // Get references to error classes (defined in errors.rb)
-    VALUE rb_eQuickJSError = rb_const_get(rb_cQuickJS, rb_intern("Error"));
     rb_eQuickJSSyntaxError = rb_const_get(rb_cQuickJS, rb_intern("SyntaxError"));
     rb_eQuickJSJavascriptError = rb_const_get(rb_cQuickJS, rb_intern("JavascriptError"));
     rb_eQuickJSMemoryLimitError = rb_const_get(rb_cQuickJS, rb_intern("MemoryLimitError"));

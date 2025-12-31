@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "minitest/autorun"
-require_relative "../lib/mquickjs"
+require_relative "../lib/quickjs"
 
 # Test helper that creates a sandbox with a mock HTTP handler
 class MockHTTPSandbox

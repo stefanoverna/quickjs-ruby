@@ -8,7 +8,7 @@ module QuickJS
   class Sandbox
     # Create a new JavaScript sandbox
     #
-    # @param memory_limit [Integer] Memory limit in bytes (default: 50,000)
+    # @param memory_limit [Integer] Memory limit in bytes (default: 1,000,000 = 1MB)
     # @param timeout_ms [Integer] Execution timeout in milliseconds (default: 5,000)
     # @param console_log_max_size [Integer] Console output limit in bytes (default: 10,000)
     # @param http [Hash, nil] HTTP configuration options (enables fetch() in JavaScript)
@@ -45,11 +45,10 @@ module QuickJS
     #   )
     #   result = sandbox.eval("fetch('https://safe-api.com/data').body")
     #
-    def initialize(memory_limit: 50_000, timeout_ms: 5000, console_log_max_size: 10_000, http: nil)
-      # The C code requires memory_limit >= 1024 bytes, but in practice the JavaScript
-      # standard library initialization requires approximately 10KB. Using a value less
-      # than this will cause the sandbox to fail during initialization.
-      raise ArgumentError, "memory_limit cannot be less than 10000 bytes (got #{memory_limit})" if memory_limit < 10_000
+    def initialize(memory_limit: 1_000_000, timeout_ms: 5000, console_log_max_size: 10_000, http: nil)
+      # QuickJS (full version) requires more memory than MicroQuickJS. The minimum
+      # practical value is around 100KB, but we recommend at least 1MB for most use cases.
+      raise ArgumentError, "memory_limit cannot be less than 100000 bytes (got #{memory_limit})" if memory_limit < 100_000
 
       @native_sandbox = NativeSandbox.new(
         memory_limit: memory_limit,

@@ -86,32 +86,32 @@ class TestQuickJS < Minitest::Test
       }
     JS
 
-    # This should fail with small memory limit (stdlib needs ~10KB minimum)
-    # Note: mquickjs might handle this differently, so we'll be lenient
+    # This should fail with small memory limit (QuickJS stdlib needs ~100KB minimum)
+    # Note: QuickJS requires more memory than MicroQuickJS
     begin
-      QuickJS.eval(code, memory_limit: 15_000) # Small but valid limit
-      # If it doesn't raise, that's ok - mquickjs might handle it gracefully
+      QuickJS.eval(code, memory_limit: 150_000) # Small but valid limit
+      # If it doesn't raise, that's ok - QuickJS might handle it gracefully
     rescue QuickJS::MemoryLimitError, QuickJS::JavascriptError
       # Expected - either out of memory or JS error
     end
   end
 
   def test_memory_limit_validation
-    # memory_limit cannot be less than 10000 bytes (required for stdlib initialization)
+    # memory_limit cannot be less than 100000 bytes (required for QuickJS stdlib initialization)
     error = assert_raises(QuickJS::ArgumentError) do
-      QuickJS::Sandbox.new(memory_limit: 5000)
+      QuickJS::Sandbox.new(memory_limit: 50000)
     end
-    assert_match(/memory_limit cannot be less than 10000/i, error.message)
-    assert_match(/5000/, error.message)
+    assert_match(/memory_limit cannot be less than 100000/i, error.message)
+    assert_match(/50000/, error.message)
 
-    # Should work with exactly 10000
-    sandbox = QuickJS::Sandbox.new(memory_limit: 10_000)
+    # Should work with exactly 100000
+    sandbox = QuickJS::Sandbox.new(memory_limit: 100_000)
     result = sandbox.eval("2 + 2")
 
     assert_equal 4, result.value
 
-    # Should work with more than 10000
-    sandbox = QuickJS::Sandbox.new(memory_limit: 20_000)
+    # Should work with more than 100000
+    sandbox = QuickJS::Sandbox.new(memory_limit: 200_000)
     result = sandbox.eval("2 + 2")
 
     assert_equal 4, result.value
