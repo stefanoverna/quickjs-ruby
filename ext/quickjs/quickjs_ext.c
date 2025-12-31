@@ -596,6 +596,11 @@ static VALUE sandbox_initialize(VALUE self, VALUE options) {
     JS_SetPropertyStr(wrapper->ctx, console, "warn",
                      JS_NewCFunction(wrapper->ctx, js_console_log, "warn", 1));
     JS_SetPropertyStr(wrapper->ctx, global, "console", console);
+
+    // Always add fetch() function to global scope (will error if HTTP not enabled)
+    JS_SetPropertyStr(wrapper->ctx, global, "fetch",
+                     JS_NewCFunction(wrapper->ctx, js_fetch, "fetch", 2));
+
     JS_FreeValue(wrapper->ctx, global);
 
     // Set memory limit AFTER context is created and initialized
@@ -711,6 +716,12 @@ static VALUE sandbox_set_variable(VALUE self, VALUE name, VALUE value) {
     TypedData_Get_Struct(self, ContextWrapper, &sandbox_type, wrapper);
 
     const char *var_name = StringValueCStr(name);
+
+    // Validate variable name is not empty
+    if (var_name == NULL || strlen(var_name) == 0) {
+        rb_raise(rb_eArgError, "Variable name cannot be empty");
+    }
+
     JSValue global = JS_GetGlobalObject(wrapper->ctx);
     JSValue js_val = ruby_to_js(wrapper->ctx, value);
 
@@ -726,12 +737,6 @@ static VALUE sandbox_set_http_callback(VALUE self, VALUE callback) {
     TypedData_Get_Struct(self, ContextWrapper, &sandbox_type, wrapper);
 
     wrapper->rb_http_callback = callback;
-
-    // Add fetch() function to global scope
-    JSValue global = JS_GetGlobalObject(wrapper->ctx);
-    JS_SetPropertyStr(wrapper->ctx, global, "fetch",
-                     JS_NewCFunction(wrapper->ctx, js_fetch, "fetch", 2));
-    JS_FreeValue(wrapper->ctx, global);
 
     return Qnil;
 }
