@@ -61,8 +61,6 @@ The `quickjs.gemspec` file needs to be created/updated.
 **Priority: Medium**
 **Status: Not Started**
 
-Currently, users must manually download QuickJS source. This should be automated.
-
 - Include QuickJS source directly in the gem
 - Increases gem size significantly
 - No download required

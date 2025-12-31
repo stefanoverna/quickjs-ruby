@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'benchmark'
-require_relative '../lib/mquickjs'
+require_relative '../lib/quickjs'
 
 module Benchmarks
   class MemoryLimits
@@ -29,34 +29,28 @@ module Benchmarks
       JS
 
       Benchmark.bm(30) do |x|
-        x.report("10KB limit:") do
-          sandbox = QuickJS::Sandbox.new(memory_limit: 10_000)
-          iterations.times do
-            begin
-              sandbox.eval(test_code)
-            rescue QuickJS::Error
-              # Expected for small limit - may run out of memory or stack
-            end
-          end
-        end
-
-        x.report("50KB limit (default):") do
-          sandbox = QuickJS::Sandbox.new(memory_limit: 50_000)
-          iterations.times { sandbox.eval(test_code) }
-        end
-
-        x.report("100KB limit:") do
-          sandbox = QuickJS::Sandbox.new(memory_limit: 100_000)
-          iterations.times { sandbox.eval(test_code) }
-        end
-
-        x.report("200KB limit:") do
-          sandbox = QuickJS::Sandbox.new(memory_limit: 200_000)
-          iterations.times { sandbox.eval(test_code) }
-        end
-
         x.report("500KB limit:") do
           sandbox = QuickJS::Sandbox.new(memory_limit: 500_000)
+          iterations.times { sandbox.eval(test_code) }
+        end
+
+        x.report("1MB limit (default):") do
+          sandbox = QuickJS::Sandbox.new(memory_limit: 1_000_000)
+          iterations.times { sandbox.eval(test_code) }
+        end
+
+        x.report("2MB limit:") do
+          sandbox = QuickJS::Sandbox.new(memory_limit: 2_000_000)
+          iterations.times { sandbox.eval(test_code) }
+        end
+
+        x.report("5MB limit:") do
+          sandbox = QuickJS::Sandbox.new(memory_limit: 5_000_000)
+          iterations.times { sandbox.eval(test_code) }
+        end
+
+        x.report("10MB limit:") do
+          sandbox = QuickJS::Sandbox.new(memory_limit: 10_000_000)
           iterations.times { sandbox.eval(test_code) }
         end
       end
@@ -71,7 +65,7 @@ module Benchmarks
         }
       JS
 
-      [10_000, 50_000, 100_000, 200_000].each do |limit|
+      [500_000, 1_000_000, 2_000_000, 5_000_000].each do |limit|
         sandbox = QuickJS::Sandbox.new(memory_limit: limit)
         begin
           result = sandbox.eval(memory_hungry_code)

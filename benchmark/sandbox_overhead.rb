@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'benchmark'
-require_relative '../lib/mquickjs'
+require_relative '../lib/quickjs'
 
 module Benchmarks
   class SandboxOverhead
