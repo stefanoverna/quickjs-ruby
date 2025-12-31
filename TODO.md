@@ -21,68 +21,6 @@ RuboCop linting cannot be run due to bundler/dependency issues.
 - Update gem dependencies to be compatible with Bundler 4.0
 - Run RuboCop through CI (GitHub Actions) which has working setup
 
-**Files Likely Affected:**
-- Ruby files in `lib/quickjs/`
-- Test files in `test/`
-- `Rakefile`
-
----
-
-### 2. Fix Failing Tests
-**Priority: High**
-**Status: ✅ Completed**
-
-All test failures have been fixed. Test suite now passes completely.
-
-**Completed Tasks:**
-- [x] Compiled native extension successfully
-- [x] Identified 2 failing tests:
-  - `test_invalid_variable_name` in set_variable_test.rb
-  - `test_error_no_http_callback` and `test_sandbox_without_http_option_disables_fetch` in fetch_test.rb
-- [x] Fixed set_variable to validate empty variable names (raises ArgumentError)
-- [x] Fixed fetch() to always be available in global scope (prevents ReferenceError)
-- [x] All tests passing on Ruby 3.3.6
-
-**Test Results:**
-- mquickjs_test.rb: 40 runs, 98 assertions, 0 failures ✓
-- set_variable_test.rb: 32 runs, 61 assertions, 0 failures ✓
-- error_documentation_test.rb: 20 runs, 50 assertions, 0 failures ✓
-- fetch_test.rb: 37 runs, all passing, 0 failures ✓
-- http_config_test.rb: 23 runs, 77 assertions, 0 failures ✓
-- http_executor_test.rb: 6 runs, 19 assertions, 0 failures ✓
-
-**Changes Made:**
-- `ext/quickjs/quickjs_ext.c:716-723` - Added empty variable name validation
-- `ext/quickjs/quickjs_ext.c:600-602` - Moved fetch() registration to sandbox initialization
-- `ext/quickjs/quickjs_ext.c:738-744` - Removed duplicate fetch() registration from http_callback setter
-
----
-
-### 3. Fix GC Assertion in Fetch Tests
-**Priority: Medium**
-**Status: Known Issue**
-
-Some fetch tests trigger a GC assertion during sandbox cleanup:
-```
-ruby: quickjs.c:1991: JS_FreeRuntime: Assertion `list_empty(&rt->gc_obj_list)' failed.
-```
-
-**Details:**
-- Tests pass correctly and functionality works
-- Issue occurs during `sandbox_free()` when cleaning up Response objects created by `fetch()`
-- Current workaround: Setting console/fetch to undefined and running GC
-- Root cause: C function references or Response objects not being fully released
-
-**Possible Solutions:**
-1. Track all created objects and explicitly free them before context destruction
-2. Use JS_FreeValue on all Response objects before freeing context
-3. Investigate QuickJS reference counting for C functions
-4. Check if we need to set opaque data differently for fetch callback
-
-**Files to Investigate:**
-- `ext/quickjs/quickjs_ext.c:498-535` (sandbox_free function)
-- `ext/quickjs/quickjs_ext.c:173-271` (js_fetch function)
-
 ---
 
 ## Enhancements
@@ -99,45 +37,9 @@ The `benchmark/` directory exists but needs to be populated with actual benchmar
 - [ ] Benchmark execution speed for common operations
 - [ ] Document performance characteristics in README
 
-**Example benchmarks:**
-- Simple arithmetic operations
-- String manipulation
-- Array/object operations
-- Function call overhead
-- Fetch operations with HTTP
-
 ---
 
-### 3. Update README
-**Priority: High**
-**Status: ✅ Completed**
-
-The README has been comprehensively updated to reflect quickjs-ruby (full QuickJS).
-
-**Completed:**
-- [x] Updated gem name references throughout
-- [x] Documented ES6+ feature support with examples (const, let, arrows, template literals, BigInt)
-- [x] Updated memory limit recommendations (1MB default vs 50KB, 100KB minimum vs 10KB)
-- [x] Added comprehensive comparison table: QuickJS vs MicroQuickJS
-  - Feature support, memory requirements, use cases
-- [x] Updated installation instructions
-- [x] Added build instructions and referenced CLAUDE.md
-- [x] Documented known GC assertion issue
-- [x] Added complete API reference
-- [x] Added security warnings and best practices
-
-**Key Differences to Document:**
-| Feature | MicroQuickJS | QuickJS (Full) |
-|---------|-------------|----------------|
-| Default Memory | 50KB | 1MB |
-| Min Memory | 10KB | 100KB |
-| ES6 Support | Limited | Full |
-| BigInt/BigFloat | No | Yes |
-| Size | Smaller | Larger |
-
----
-
-### 4. Gemspec Configuration
+### 3. Gemspec Configuration
 **Priority: High**
 **Status: Not Started**
 
@@ -153,12 +55,9 @@ The `quickjs.gemspec` file needs to be created/updated.
 - [ ] Add authors and license information
 - [ ] Configure files to include/exclude
 
-**Post-Install Message:**
-Should instruct users that QuickJS source will be downloaded automatically during `gem install`, or they need to download it manually for development.
-
 ---
 
-### 5. Automated QuickJS Download
+### 4. Automated QuickJS Download
 **Priority: Medium**
 **Status: Not Started**
 
@@ -170,7 +69,7 @@ Currently, users must manually download QuickJS source. This should be automated
 
 ---
 
-### 6. CI/CD Setup
+### 5. CI/CD Setup
 **Priority: Medium**
 **Status: Not Started**
 
@@ -184,29 +83,9 @@ Add GitHub Actions for automated testing and building.
 - [ ] Build gem and verify it installs correctly
 - [ ] Add coverage reporting
 
-**Example Workflow:**
-```yaml
-name: Tests
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        ruby: ['2.7', '3.0', '3.1', '3.2', '3.3']
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ matrix.ruby }}
-      - run: bundle install
-      - run: rake compile
-      - run: rake test
-```
-
 ---
 
-### 7. Documentation Improvements
+### 6. Documentation Improvements
 **Priority: Low**
 **Status: Not Started**
 
@@ -220,7 +99,7 @@ jobs:
 
 ---
 
-### 8. Additional Tests
+### 7. Additional Tests
 **Priority: Medium**
 **Status: Partially Complete**
 
@@ -236,40 +115,7 @@ jobs:
 
 ---
 
-### 9. Double check that everything is setup like mquickjs-ruby
-**Priority: High**
-**Status: ✅ Completed**
-
-Cloned mquickjs-ruby and successfully adapted all key infrastructure:
-
-**Completed:**
-- [x] Copied and adapted `.github/workflows/ci.yml`
-  - CI tests on Ruby 2.7, 3.0, 3.1, 3.2, 3.3
-  - RuboCop linting
-- [x] Copied and adapted `.rubocop.yml`
-  - Updated paths for quickjs gem
-- [x] Created `UPDATING_QUICKJS.md` (adapted from UPDATING_MQUICKJS.md)
-  - Documents tarball-based update process
-  - QuickJS uses releases from bellard.org, not git
-- [x] Updated `Rakefile`
-  - Fixed `update_quickjs` task to download tarball instead of git clone
-  - Verified task works correctly
-- [x] Updated `.gitignore`
-  - Simplified patterns using wildcards
-  - Proper exclusion of build artifacts
-- [x] Added QuickJS source files to `ext/quickjs/quickjs-src/`
-  - 22 files from QuickJS 2024-01-13
-  - Verified compilation works (2.7MB native extension)
-- [x] Compared `Gemfile` and `gemspec` - already properly configured
-
-**Differences (intentional):**
-- QuickJS uses tarball distribution (bellard.org) vs MicroQuickJS git repository
-- Different exclude files in Rakefile (qjs.c, qjsc.c vs mqjs.c)
-- QuickJS includes BigInt library (libbf.c)
-
----
-
-### 10. Document Rake Usage in CLAUDE.md
+### 8. Document Rake Usage in CLAUDE.md
 **Priority: Medium**
 **Status: Not Started**
 
@@ -278,24 +124,19 @@ Add section to CLAUDE.md explaining how to run rake tasks properly:
 **Tasks:**
 - [ ] Document that bundler may fail when running as root
 - [ ] Explain gems are already installed globally in the system
-- [ ] Provide paths to globally installed executables:
-  - RuboCop: `/opt/rbenv/versions/3.3.6/lib/ruby/gems/3.3.0/gems/rubocop-*/exe/rubocop`
-  - Rake: `/opt/rbenv/versions/3.3.6/bin/rake` (requires rake-compiler gem)
 - [ ] Document workaround: direct compilation with `ruby extconf.rb && make`
 - [ ] Note that rake-compiler may need to be installed for rake tasks to work
 
 ---
 
-### 11. Release Preparation
+### 9. Release Preparation
 **Priority: High**
 **Status: Not Started**
 
 Before releasing to RubyGems:
 
 **Tasks:**
-- [ ] Complete gemspec configuration (#4)
-- [ ] Update README (#3)
-- [ ] Fix critical GC issue (#1) or document workaround
+- [ ] Complete gemspec configuration (#3)
 - [ ] Add CHANGELOG.md with version history
 - [ ] Tag initial release (v0.1.0 or v1.0.0)
 - [ ] Test gem installation from source
@@ -326,9 +167,9 @@ These features could differentiate quickjs-ruby from alternatives:
 Document these in README:
 
 1. **Platform Support**:
-   - ✅ Linux (tested)
-   - ❓ macOS (should work, needs testing)
-   - ❓ Windows (may need adjustments)
+   - macOS (tested, working)
+   - Linux (should work, needs testing)
+   - Windows (may need adjustments)
 
 2. **Ruby Version Support**:
    - Minimum: Ruby 2.7 (uses TypedData API)
@@ -367,48 +208,15 @@ Document these in README:
 
 ---
 
-## Completed ✅
+## Technical Notes
 
-### Core Functionality
-- [x] Download and integrate QuickJS source code
-- [x] Build system with extconf.rb
-- [x] C extension wrapping QuickJS
-- [x] Memory limit configuration
-- [x] Timeout support
-- [x] Console output capture
-- [x] HTTP fetch() implementation
-- [x] Error handling (SyntaxError, JavascriptError, etc.)
-- [x] Type conversion (Ruby ↔ JavaScript)
-- [x] Test suite (100% passing - 158 runs, 305 assertions, 0 failures)
-- [x] Update tests for QuickJS ES6+ support
-- [x] Fix Result object initialization
-- [x] Fix empty variable name validation in set_variable
-- [x] Fix fetch() availability (always present, errors when HTTP not configured)
+### Ruby Exception Handling in C Callbacks
 
-### Documentation
-- [x] Build documentation (CLAUDE.md)
-- [x] Comprehensive README with QuickJS vs MicroQuickJS comparison
-- [x] Document modern JavaScript features (ES6+)
-- [x] Update memory limit recommendations (1MB default, 100KB minimum)
-- [x] Document known GC assertion issue
-- [x] Create UPDATING_QUICKJS.md for upstream updates
+When implementing C functions that are called from JavaScript (like `fetch()`), **never use `rb_exc_raise()` directly**. Ruby's exception mechanism uses `longjmp` which bypasses QuickJS's call stack cleanup, leaving JavaScript objects in an inconsistent state.
 
-### Infrastructure
-- [x] Git repository setup and initial commits
-- [x] GitHub Actions CI/CD (`.github/workflows/ci.yml`)
-  - Multi-version Ruby testing (2.7, 3.0, 3.1, 3.2, 3.3)
-  - RuboCop linting
-- [x] RuboCop configuration (`.rubocop.yml`)
-- [x] Rakefile with QuickJS update task
-  - Downloads from bellard.org (tarball-based)
-  - Proper file exclusions
-  - Verified working
-- [x] Proper `.gitignore` patterns
-- [x] Add QuickJS 2024-01-13 source files to repository
-  - 22 source files in `ext/quickjs/quickjs-src/`
-  - Verified compilation (2.7MB native extension)
+**Correct pattern:**
+1. Store the Ruby exception in a wrapper struct field
+2. Return `JS_ThrowInternalError()` to QuickJS so it can clean up properly
+3. After `JS_Eval()` returns, check for the pending exception and re-raise it
 
-### Infrastructure Parity with mquickjs-ruby
-- [x] Clone and compare mquickjs-ruby repository
-- [x] Adapt all key files (Rakefile, workflows, configs)
-- [x] Document intentional differences (tarball vs git, different exclude files)
+This ensures QuickJS properly frees all JavaScript objects before Ruby takes over exception handling.

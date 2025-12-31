@@ -39,6 +39,7 @@ typedef struct {
     size_t console_max_size;
     int console_truncated;
     VALUE rb_http_callback;  // Ruby callback for HTTP requests
+    VALUE pending_ruby_exception;  // Ruby exception to re-raise after JS execution
 } ContextWrapper;
 
 // Thread-local storage for current wrapper
@@ -146,29 +147,6 @@ static VALUE http_callback_wrapper(VALUE arg) {
                       args->method, args->url, args->body, args->headers);
 }
 
-// Re-raise HTTP exception with console output
-static void reraise_http_error_with_console(ContextWrapper *wrapper, VALUE exception) {
-    VALUE exc_class = rb_obj_class(exception);
-    VALUE message = rb_funcall(exception, rb_intern("message"), 0);
-
-    // Create console output strings
-    VALUE console_output = rb_str_new(wrapper->console_output, wrapper->console_output_len);
-    VALUE console_truncated = wrapper->console_truncated ? Qtrue : Qfalse;
-
-    // Check if this is one of our HTTP error classes
-    if (exc_class == rb_eQuickJSHTTPBlockedError ||
-        exc_class == rb_eQuickJSHTTPLimitError ||
-        exc_class == rb_eQuickJSHTTPError) {
-        // Create new exception with console output
-        VALUE argv[3] = { message, console_output, console_truncated };
-        VALUE new_exception = rb_class_new_instance(3, argv, exc_class);
-        rb_exc_raise(new_exception);
-    } else {
-        // Re-raise original exception
-        rb_exc_raise(exception);
-    }
-}
-
 // fetch() implementation
 static JSValue js_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
     ContextWrapper *wrapper = current_wrapper;
@@ -237,9 +215,14 @@ static JSValue js_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     if (state) {
         VALUE exception = rb_errinfo();
         rb_set_errinfo(Qnil);  // Clear the error
-        reraise_http_error_with_console(wrapper, exception);
-        // This line is never reached, but we need to return something
-        return JS_EXCEPTION;
+
+        // Store the exception to re-raise after JS execution completes
+        // We cannot call rb_exc_raise here because it would longjmp
+        // out of QuickJS's call stack, leaving objects in an inconsistent state
+        wrapper->pending_ruby_exception = exception;
+
+        // Return a JavaScript exception so QuickJS can clean up properly
+        return JS_ThrowInternalError(ctx, "HTTP request failed");
     }
 
     // Extract response fields from Ruby hash
@@ -498,21 +481,7 @@ static JSValue ruby_to_js(JSContext *ctx, VALUE rb_val) {
 static void sandbox_free(void *ptr) {
     ContextWrapper *wrapper = (ContextWrapper *)ptr;
     if (wrapper) {
-        if (wrapper->ctx && wrapper->rt) {
-            // Get the global object
-            JSValue global = JS_GetGlobalObject(wrapper->ctx);
-
-            // Manually set console and fetch to undefined to release C function references
-            // This is necessary because CFunctions hold references that prevent GC cleanup
-            JS_SetPropertyStr(wrapper->ctx, global, "console", JS_UNDEFINED);
-            JS_SetPropertyStr(wrapper->ctx, global, "fetch", JS_UNDEFINED);
-
-            // Free the global object reference
-            JS_FreeValue(wrapper->ctx, global);
-
-            // Run garbage collection to clean up
-            JS_RunGC(wrapper->rt);
-
+        if (wrapper->ctx) {
             // Free context first
             JS_FreeContext(wrapper->ctx);
             wrapper->ctx = NULL;
@@ -562,6 +531,7 @@ static VALUE sandbox_initialize(VALUE self, VALUE options) {
     wrapper->timeout_ms = NIL_P(rb_timeout) ? 5000 : NUM2LL(rb_timeout);
     wrapper->console_max_size = NIL_P(rb_console_max) ? 10000 : NUM2SIZET(rb_console_max);
     wrapper->rb_http_callback = Qnil;
+    wrapper->pending_ruby_exception = Qnil;
 
     // Initialize console output buffer
     wrapper->console_output_capacity = 1024;
@@ -615,11 +585,12 @@ static VALUE sandbox_eval(VALUE self, VALUE code) {
     ContextWrapper *wrapper;
     TypedData_Get_Struct(self, ContextWrapper, &sandbox_type, wrapper);
 
-    // Reset console output
+    // Reset console output and pending exception
     wrapper->console_output_len = 0;
     wrapper->console_output[0] = '\0';
     wrapper->console_truncated = 0;
     wrapper->timed_out = 0;
+    wrapper->pending_ruby_exception = Qnil;
 
     // Set start time
     wrapper->start_time_ms = get_time_ms();
@@ -654,6 +625,35 @@ static VALUE sandbox_eval(VALUE self, VALUE code) {
     if (JS_IsException(result)) {
         JSValue exception = JS_GetException(wrapper->ctx);
 
+        // Check if there's a pending Ruby exception (from HTTP callback)
+        // This must be re-raised AFTER QuickJS has cleaned up
+        if (wrapper->pending_ruby_exception != Qnil) {
+            VALUE pending = wrapper->pending_ruby_exception;
+            wrapper->pending_ruby_exception = Qnil;
+
+            // Free the JS exception and run GC to clean up
+            JS_FreeValue(wrapper->ctx, exception);
+            JS_RunGC(wrapper->rt);
+
+            // Now re-raise the Ruby exception with console output
+            VALUE exc_class = rb_obj_class(pending);
+            VALUE message = rb_funcall(pending, rb_intern("message"), 0);
+
+            // Check if this is one of our HTTP error classes
+            if (exc_class == rb_eQuickJSHTTPBlockedError ||
+                exc_class == rb_eQuickJSHTTPLimitError ||
+                exc_class == rb_eQuickJSHTTPError) {
+                // Create new exception with console output
+                VALUE argv[3] = { message, console_output, console_truncated };
+                VALUE new_exception = rb_class_new_instance(3, argv, exc_class);
+                rb_exc_raise(new_exception);
+            } else {
+                // Re-raise original exception
+                rb_exc_raise(pending);
+            }
+        }
+
+        // Regular JavaScript exception handling
         // Try to get error message - QuickJS provides js_error_to_string
         const char *exception_str = JS_ToCString(wrapper->ctx, exception);
 
