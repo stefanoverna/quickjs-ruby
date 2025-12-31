@@ -56,19 +56,21 @@ The `benchmark/` directory exists but needs to be populated with actual benchmar
 
 ### 3. Update README
 **Priority: High**
-**Status: Partially Complete**
+**Status: ✅ Completed**
 
-The README needs updates to reflect this is now **quickjs-ruby** (full QuickJS) not mquickjs-ruby.
+The README has been comprehensively updated to reflect quickjs-ruby (full QuickJS).
 
-**Tasks:**
-- [ ] Update gem name references throughout
-- [ ] Document ES6+ feature support (const, let, arrows, template literals, BigInt)
-- [ ] Update memory limit recommendations (1MB default vs 50KB)
-- [ ] Add comparison table: QuickJS vs MicroQuickJS
-- [ ] Update installation instructions
-- [ ] Add build instructions (or reference CLAUDE.md)
-- [ ] Document known issues (GC assertion)
-- [ ] Add performance notes
+**Completed:**
+- [x] Updated gem name references throughout
+- [x] Documented ES6+ feature support with examples (const, let, arrows, template literals, BigInt)
+- [x] Updated memory limit recommendations (1MB default vs 50KB, 100KB minimum vs 10KB)
+- [x] Added comprehensive comparison table: QuickJS vs MicroQuickJS
+  - Feature support, memory requirements, use cases
+- [x] Updated installation instructions
+- [x] Added build instructions and referenced CLAUDE.md
+- [x] Documented known GC assertion issue
+- [x] Added complete API reference
+- [x] Added security warnings and best practices
 
 **Key Differences to Document:**
 | Feature | MicroQuickJS | QuickJS (Full) |
@@ -181,12 +183,56 @@ jobs:
 ---
 
 ### 9. Double check that everything is setup like mquickjs-ruby
+**Priority: High**
+**Status: ✅ Completed**
 
-Clone https://github.com/stefanoverna/mquickjs-ruby.git and make sure to "copy and adapt" Rakefile, UPDATING_MQUICKJS.md, .github/workflows, and anything else you can find that it's different without a real reason.
+Cloned mquickjs-ruby and successfully adapted all key infrastructure:
+
+**Completed:**
+- [x] Copied and adapted `.github/workflows/ci.yml`
+  - CI tests on Ruby 2.7, 3.0, 3.1, 3.2, 3.3
+  - RuboCop linting
+- [x] Copied and adapted `.rubocop.yml`
+  - Updated paths for quickjs gem
+- [x] Created `UPDATING_QUICKJS.md` (adapted from UPDATING_MQUICKJS.md)
+  - Documents tarball-based update process
+  - QuickJS uses releases from bellard.org, not git
+- [x] Updated `Rakefile`
+  - Fixed `update_quickjs` task to download tarball instead of git clone
+  - Verified task works correctly
+- [x] Updated `.gitignore`
+  - Simplified patterns using wildcards
+  - Proper exclusion of build artifacts
+- [x] Added QuickJS source files to `ext/quickjs/quickjs-src/`
+  - 22 files from QuickJS 2024-01-13
+  - Verified compilation works (2.7MB native extension)
+- [x] Compared `Gemfile` and `gemspec` - already properly configured
+
+**Differences (intentional):**
+- QuickJS uses tarball distribution (bellard.org) vs MicroQuickJS git repository
+- Different exclude files in Rakefile (qjs.c, qjsc.c vs mqjs.c)
+- QuickJS includes BigInt library (libbf.c)
 
 ---
 
-### 9. Release Preparation
+### 10. Document Rake Usage in CLAUDE.md
+**Priority: Medium**
+**Status: Not Started**
+
+Add section to CLAUDE.md explaining how to run rake tasks properly:
+
+**Tasks:**
+- [ ] Document that bundler may fail when running as root
+- [ ] Explain gems are already installed globally in the system
+- [ ] Provide paths to globally installed executables:
+  - RuboCop: `/opt/rbenv/versions/3.3.6/lib/ruby/gems/3.3.0/gems/rubocop-*/exe/rubocop`
+  - Rake: `/opt/rbenv/versions/3.3.6/bin/rake` (requires rake-compiler gem)
+- [ ] Document workaround: direct compilation with `ruby extconf.rb && make`
+- [ ] Note that rake-compiler may need to be installed for rake tasks to work
+
+---
+
+### 11. Release Preparation
 **Priority: High**
 **Status: Not Started**
 
@@ -269,6 +315,7 @@ Document these in README:
 
 ## Completed ✅
 
+### Core Functionality
 - [x] Download and integrate QuickJS source code
 - [x] Build system with extconf.rb
 - [x] C extension wrapping QuickJS
@@ -279,8 +326,33 @@ Document these in README:
 - [x] Error handling (SyntaxError, JavascriptError, etc.)
 - [x] Type conversion (Ruby ↔ JavaScript)
 - [x] Test suite (95%+ passing)
-- [x] Build documentation (CLAUDE.md)
 - [x] Update tests for QuickJS ES6+ support
 - [x] Fix Result object initialization
-- [x] Git repository setup
-- [x] Initial commit and push
+
+### Documentation
+- [x] Build documentation (CLAUDE.md)
+- [x] Comprehensive README with QuickJS vs MicroQuickJS comparison
+- [x] Document modern JavaScript features (ES6+)
+- [x] Update memory limit recommendations (1MB default, 100KB minimum)
+- [x] Document known GC assertion issue
+- [x] Create UPDATING_QUICKJS.md for upstream updates
+
+### Infrastructure
+- [x] Git repository setup and initial commits
+- [x] GitHub Actions CI/CD (`.github/workflows/ci.yml`)
+  - Multi-version Ruby testing (2.7, 3.0, 3.1, 3.2, 3.3)
+  - RuboCop linting
+- [x] RuboCop configuration (`.rubocop.yml`)
+- [x] Rakefile with QuickJS update task
+  - Downloads from bellard.org (tarball-based)
+  - Proper file exclusions
+  - Verified working
+- [x] Proper `.gitignore` patterns
+- [x] Add QuickJS 2024-01-13 source files to repository
+  - 22 source files in `ext/quickjs/quickjs-src/`
+  - Verified compilation (2.7MB native extension)
+
+### Infrastructure Parity with mquickjs-ruby
+- [x] Clone and compare mquickjs-ruby repository
+- [x] Adapt all key files (Rakefile, workflows, configs)
+- [x] Document intentional differences (tarball vs git, different exclude files)
