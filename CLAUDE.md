@@ -88,6 +88,24 @@ If simple scripts like `1 + 1` fail with errors, the memory limit is too low. Qu
 2. Verify Ruby development headers are installed: `ruby -rrbconfig -e "puts RbConfig::CONFIG['includedir']"`
 3. Check that QuickJS source is present: `ls ext/quickjs/quickjs.c`
 
+### CGI Class Variable Error (`uninitialized class variable @@accept_charset`)
+
+If you see this error when running `bundle install` or other bundler commands:
+
+```
+uninitialized class variable @@accept_charset in #<Class:CGI> (NameError)
+```
+
+This is a known Ruby bug where the CGI library isn't properly initialized when loaded indirectly by gems. The workaround is to pre-load the CGI library using `RUBYOPT`:
+
+```bash
+RUBYOPT="-rcgi" bundle install
+RUBYOPT="-rcgi" rake compile
+RUBYOPT="-rcgi" rake test
+```
+
+This ensures the CGI library is fully loaded before any gems that might trigger the issue.
+
 ## Files Overview
 
 - `ext/quickjs/extconf.rb` - Build configuration
