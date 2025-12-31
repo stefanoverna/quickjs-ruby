@@ -48,7 +48,10 @@ module QuickJS
     def initialize(memory_limit: 1_000_000, timeout_ms: 5000, console_log_max_size: 10_000, http: nil)
       # QuickJS (full version) requires more memory than MicroQuickJS. The minimum
       # practical value is around 100KB, but we recommend at least 1MB for most use cases.
-      raise ArgumentError, "memory_limit cannot be less than 100000 bytes (got #{memory_limit})" if memory_limit < 100_000
+      if memory_limit < 100_000
+        raise ArgumentError,
+              "memory_limit cannot be less than 100000 bytes (got #{memory_limit})"
+      end
 
       @native_sandbox = NativeSandbox.new(
         memory_limit: memory_limit,

@@ -26,22 +26,26 @@ class ErrorDocumentationTest < Minitest::Test
   # QuickJS (full version) supports ES6+ features - these should work, not raise errors
   def test_const_keyword_works
     result = @sandbox.eval("const x = 10; x")
+
     assert_equal 10, result.value
   end
 
   def test_let_keyword_works
     result = @sandbox.eval("let y = 20; y")
+
     assert_equal 20, result.value
   end
 
   def test_arrow_function_works
     result = @sandbox.eval("[1,2,3].map(x => x * 2)")
+
     assert_equal [2, 4, 6], result.value
   end
 
   def test_template_literal_works
     @sandbox.set_variable("literal", "world")
     result = @sandbox.eval("`template ${literal}`")
+
     assert_equal "template world", result.value
   end
 
