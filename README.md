@@ -75,10 +75,8 @@ This gem uses the **full QuickJS engine**, not MicroQuickJS. Here are the key di
   - [Sandboxing](#sandboxing)
   - [Error Handling](#error-handling)
 - [API Reference](#api-reference)
-- [Known Issues](#known-issues)
 - [Development](#development)
 - [License](#license)
-- [Credits](#credits)
 
 ## Features
 
@@ -538,23 +536,6 @@ result.value           # => 42
 result.console_output  # => "hi"
 ```
 
-## Known Issues
-
-### GC Assertion in Fetch Tests
-
-Some fetch-related tests trigger a GC assertion during cleanup:
-```
-Assertion `list_empty(&rt->gc_obj_list)' failed
-```
-
-**Status:** Tests pass and functionality works correctly. This is a cleanup issue that doesn't affect normal operation.
-
-**Workaround:** The gem includes automatic cleanup to prevent this in most cases.
-
-**Files:** See ext/quickjs/quickjs_ext.c:498-535 (sandbox_free)
-
-This issue is being investigated and will be fixed in a future release.
-
 ## Development
 
 ```bash
@@ -588,9 +569,3 @@ See [UPDATING_QUICKJS.md](UPDATING_QUICKJS.md) for information on updating to ne
 ## License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
-
-## Credits
-
-- **QuickJS**: Created by Fabrice Bellard - https://bellard.org/quickjs/
-- **mquickjs-ruby**: Original gem by Stefano Verna - https://github.com/stefanoverna/mquickjs-ruby
-- This gem maintains API compatibility with mquickjs-ruby while providing full QuickJS capabilities
