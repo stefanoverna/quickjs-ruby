@@ -6,201 +6,140 @@ This document explains how to update the QuickJS library to the latest upstream 
 
 ```bash
 rake update_quickjs
+rake clean compile test
 ```
 
-This will automatically download and update all necessary files from the [official QuickJS releases](https://bellard.org/quickjs/).
+## File Architecture
 
-## What Gets Updated
+Everything lives in `ext/quickjs/`. There are two types of files:
 
-The rake task automatically:
+### Your Files (Protected)
 
-1. **Downloads** the latest QuickJS release from bellard.org
-2. **Extracts** the tarball
-3. **Copies** all C and H files except Ruby-specific and excluded files
-4. **Creates a backup** of existing files (with timestamp)
-5. **Detects new files** automatically (future-proof)
-6. **Warns about removed files** if any exist locally but not upstream
+These are **never overwritten** by `rake update_quickjs`:
 
-## Files Updated from Upstream
+| File | Purpose |
+|------|---------|
+| `quickjs_ext.c` | Ruby extension wrapper (C bindings) |
+| `extconf.rb` | Build configuration |
 
-The task copies ALL `.c` and `.h` files from upstream, EXCEPT:
+### Upstream Files (Managed)
 
-### Excluded Files (Ruby-specific)
-- `quickjs_ext.c` - Ruby native extension binding
-- `quickjs_wrapper.h` - Ruby-specific wrapper
-- `extconf.rb` - Ruby extension build configuration
+These come from [QuickJS on GitHub](https://github.com/bellard/quickjs) and are updated by `rake update_quickjs`:
 
-### Excluded Files (Not needed)
-- `qjs.c` - REPL implementation (not needed for embedding)
-- `qjsc.c` - QuickJS compiler (not needed for embedding)
-- `run-test262.c` - Test runner
-- `repl.c`, `repl.js` - REPL implementation
-- `examples/*.c` - Example files
+| File | Purpose |
+|------|---------|
+| `quickjs.c`, `quickjs.h` | Main QuickJS engine |
+| `quickjs-libc.c`, `quickjs-libc.h` | C standard library bindings |
+| `libbf.c`, `libbf.h` | BigFloat/BigInt library |
+| `libregexp.c`, `libregexp.h` | Regular expression support |
+| `libunicode.c`, `libunicode.h` | Unicode support |
+| `cutils.c`, `cutils.h` | Utility functions |
+| `*.h` (various) | Header files |
 
-## Files Typically Updated
+## What `rake update_quickjs` Does
 
-Core engine files that get updated:
-- `quickjs.c`, `quickjs.h` - Main QuickJS engine
-- `quickjs-libc.c`, `quickjs-libc.h` - C standard library bindings
-- `quickjs-opcode.h` - VM opcodes
-- `quickjs-atom.h` - Atom definitions
-- `cutils.c`, `cutils.h` - Utility functions
-- `libbf.c`, `libbf.h` - BigFloat/BigInt library
-- `libunicode.c`, `libunicode.h` - Unicode support
-- `libregexp.c`, `libregexp.h` - Regular expression support
-- `list.h` - List data structure
-
-**Plus any new files added by upstream** (automatically included!).
+1. Clones the latest QuickJS from GitHub
+2. Copies all `.c` and `.h` files to `ext/quickjs/`
+3. **Skips** your files (listed in `QUICKJS_EXCLUDE_FILES` in Rakefile)
+4. Creates a timestamped backup before overwriting
 
 ## Full Update Process
 
-1. **Update the files**:
-   ```bash
-   rake update_quickjs
-   ```
+```bash
+# 1. Update the files
+rake update_quickjs
 
-2. **Review the changes**:
-   ```bash
-   git diff ext/quickjs/
-   ```
+# 2. Review the changes
+git diff ext/quickjs/
 
-3. **Clean and rebuild**:
-   ```bash
-   rake clean
-   rake compile
-   ```
+# 3. Clean and rebuild
+rake clean compile
 
-4. **Run tests**:
-   ```bash
-   rake test
-   ```
+# 4. Run tests
+rake test
 
-5. **Run benchmarks** (optional but recommended):
-   ```bash
-   rake benchmark
-   ```
+# 5. If everything works, commit
+git add ext/quickjs/
+git commit -m "Update QuickJS to YYYY-MM-DD"
 
-6. **If everything works**, commit and cleanup:
-   ```bash
-   git add ext/quickjs/
-   git commit -m "Update QuickJS to version YYYY-MM-DD"
-   rm -rf ext/quickjs/backup_*
-   ```
+# 6. Clean up backups
+rm -rf ext/quickjs/backup_*
+```
 
 ## If Something Goes Wrong
 
-### Restore from backup
+### Restore from Backup
 
-If the update breaks something, the task creates a timestamped backup directory:
+The update task creates a timestamped backup:
 
 ```bash
 # Find the backup
 ls -la ext/quickjs/backup_*
 
-# Restore all files
+# Restore
 cp ext/quickjs/backup_YYYYMMDD_HHMMSS/* ext/quickjs/
 
 # Rebuild
 rake clean compile
 ```
 
-### Check for API changes
+### Common Issues
 
-If tests fail after updating, check for:
+**Build fails after update:**
+- Check if upstream added new source files (add them to `extconf.rb`)
+- Check if upstream removed source files (remove them from `extconf.rb`)
+- Check for API changes in `quickjs.h`
 
-1. **Changed C API** - Review `quickjs.h` for API changes
-2. **Changed opcodes** - Check `quickjs-opcode.h`
-3. **New required files** - The task will report "Added (new)" files
-4. **Removed files** - The task will warn about files that exist locally but not upstream
+**Tests fail after update:**
+- JavaScript engine behavior may have changed
+- Check memory management changes
+- Run individual tests to isolate the issue
 
-You may need to update `ext/quickjs/quickjs_ext.c` if the C API changed.
+## Adding/Removing Source Files
+
+If upstream adds or removes `.c` files, update `extconf.rb`:
+
+```ruby
+$srcs = %w[
+  quickjs_ext.c      # YOUR file - always keep this
+  quickjs.c          # Upstream files below
+  libregexp.c
+  libunicode.c
+  cutils.c
+  libbf.c
+  quickjs-libc.c
+  new_file.c         # Add new upstream files here
+]
+```
+
+## Protected Files List
+
+The `QUICKJS_EXCLUDE_FILES` constant in `Rakefile` protects these files from being overwritten:
+
+```ruby
+QUICKJS_EXCLUDE_FILES = %w[
+  quickjs_ext.c       # Your Ruby extension
+  extconf.rb          # Your build config
+  qjs.c               # QuickJS CLI (not needed)
+  qjsc.c              # QuickJS compiler (not needed)
+  run-test262.c       # Test runner (not needed)
+  unicode_gen.c       # Generator tool (not needed)
+]
+```
 
 ## Manual Update (Alternative)
 
 If you prefer manual control:
 
-1. Download QuickJS:
-   ```bash
-   cd /tmp
-   curl -L https://bellard.org/quickjs/quickjs-2024-01-13.tar.xz -o quickjs.tar.xz
-   tar -xf quickjs.tar.xz
-   ```
-
-2. Copy files manually:
-   ```bash
-   # Copy core files (adjust list as needed)
-   cp /tmp/quickjs-2024-01-13/*.{c,h} ext/quickjs/
-
-   # Don't overwrite Ruby-specific files
-   git checkout ext/quickjs/quickjs_ext.c
-   git checkout ext/quickjs/quickjs_wrapper.h
-   git checkout ext/quickjs/extconf.rb
-   ```
-
-3. Rebuild:
-   ```bash
-   rake clean compile test
-   ```
-
-## Checking Upstream Version
-
-To see what's available upstream:
-
 ```bash
-# Visit the official QuickJS website
-open https://bellard.org/quickjs/
+# Clone QuickJS
+git clone --depth 1 https://github.com/bellard/quickjs.git /tmp/quickjs
 
-# Check the CHANGELOG
-curl -s https://bellard.org/quickjs/Changelog
+# Copy core files (preserving your files)
+cp /tmp/quickjs/*.{c,h} ext/quickjs/
+git checkout ext/quickjs/quickjs_ext.c
+git checkout ext/quickjs/extconf.rb
+
+# Rebuild
+rake clean compile test
 ```
-
-## Troubleshooting
-
-### Build fails after update
-
-1. Check if upstream added new dependencies
-2. Review the error message from the compiler
-3. Check if the C API changed in `quickjs.h`
-4. Restore from backup and investigate incrementally
-
-### Tests fail after update
-
-1. Check for JavaScript engine behavior changes
-2. Review changes in `quickjs.c` related to memory management
-3. Check for changes in error handling
-4. Run individual tests to isolate the issue
-
-### New compiler warnings
-
-1. Review the warnings - they may indicate real issues
-2. Check if upstream fixed any undefined behavior
-3. Consider updating compiler flags in `extconf.rb` if needed
-
-## Version Tracking
-
-QuickJS uses date-based versioning (e.g., `2024-01-13`). The version is typically found in:
-- The tarball filename
-- The `Changelog` file in the distribution
-- Sometimes in comments at the top of `quickjs.c`
-
-## Future-Proofing
-
-This rake task is designed to be **future-proof**:
-
-- ✅ Automatically detects new upstream files
-- ✅ Warns about removed files
-- ✅ Preserves Ruby-specific customizations
-- ✅ Creates timestamped backups
-- ✅ No hardcoded file lists to maintain
-
-If upstream adds new files, they'll be automatically included!
-
-## Differences from MicroQuickJS
-
-Note that this gem uses **full QuickJS**, not MicroQuickJS:
-
-- QuickJS is distributed as tarballs from bellard.org
-- MicroQuickJS is a git repository on GitHub
-- QuickJS includes BigInt/BigFloat support (libbf.c)
-- QuickJS has full ES2020+ support
-- QuickJS requires more memory but offers more features

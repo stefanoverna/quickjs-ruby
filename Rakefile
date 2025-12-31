@@ -77,7 +77,7 @@ end
 
 # Update quickjs from upstream
 # Configuration constants
-QUICKJS_URL = "https://bellard.org/quickjs/quickjs-2024-01-13.tar.xz"
+QUICKJS_DOWNLOAD_PAGE = "https://bellard.org/quickjs/"
 QUICKJS_EXT_DIR = "ext/quickjs"
 
 # Files to EXCLUDE from the upstream copy (Ruby-specific or not needed)
@@ -91,17 +91,17 @@ QUICKJS_EXCLUDE_FILES = %w[
   repl.c
   repl.js
   unicode_gen.c
-  libunicode-table.h
 ].freeze
 
-desc "Update QuickJS to the latest version from bellard.org"
+desc "Update QuickJS to the latest version from GitHub"
 task :update_quickjs do
   require "fileutils"
   require "tmpdir"
-  require "open-uri"
+
+  quickjs_git_repo = "https://github.com/bellard/quickjs.git"
 
   puts "Updating QuickJS from upstream..."
-  puts "Source: #{QUICKJS_URL}"
+  puts "Source: #{quickjs_git_repo}"
   puts ""
 
   # Create backup directory
@@ -116,42 +116,33 @@ task :update_quickjs do
   end
 
   puts ""
-  puts "Downloading QuickJS tarball..."
+  puts "Cloning QuickJS repository..."
 
-  # Download and extract to a temp directory
+  # Clone/update to a temp directory
   Dir.mktmpdir do |tmp_dir|
-    tarball_path = File.join(tmp_dir, "quickjs.tar.xz")
-    extract_dir = File.join(tmp_dir, "quickjs")
+    repo_dir = File.join(tmp_dir, "quickjs")
 
-    # Download the tarball
-    begin
-      URI.open(QUICKJS_URL) do |remote|
-        File.open(tarball_path, "wb") do |local|
-          local.write(remote.read)
-        end
-      end
-    rescue StandardError => e
-      puts "Failed to download tarball: #{e.message}"
-      puts "Restoring from backup..."
+    # Clone the repository
+    unless system("git clone --depth 1 #{quickjs_git_repo} #{repo_dir}")
+      puts "Failed to clone repository. Restoring from backup..."
       FileUtils.cp(Dir.glob("#{backup_dir}/*"), QUICKJS_EXT_DIR)
-      abort "Update failed: Could not download QuickJS"
+      abort "Update failed: Could not clone QuickJS repository"
     end
 
-    puts "Extracting tarball..."
-
-    # Extract the tarball
-    FileUtils.mkdir_p(extract_dir)
-    unless system("tar -xf #{tarball_path} -C #{extract_dir} --strip-components=1")
-      puts "Failed to extract tarball. Restoring from backup..."
-      FileUtils.cp(Dir.glob("#{backup_dir}/*"), QUICKJS_EXT_DIR)
-      abort "Update failed: Could not extract tarball"
-    end
+    # Get the latest commit hash for reference
+    commit_hash = `cd #{repo_dir} && git rev-parse HEAD`.strip
+    commit_date = `cd #{repo_dir} && git log -1 --format=%ci`.strip
+    puts ""
+    puts "Fetched QuickJS version:"
+    puts "  Commit: #{commit_hash[0..7]}"
+    puts "  Date: #{commit_date}"
+    puts ""
 
     puts "Copying updated files..."
     puts ""
 
-    # Get all C and H files from the extracted directory
-    upstream_files = Dir.glob("#{extract_dir}/*.{c,h}").map { |f| File.basename(f) }
+    # Get all C and H files from the repository
+    upstream_files = Dir.glob("#{repo_dir}/*.{c,h}").map { |f| File.basename(f) }
 
     # Filter out excluded files
     files_to_copy = upstream_files - QUICKJS_EXCLUDE_FILES
@@ -164,7 +155,7 @@ task :update_quickjs do
     # Copy files
     copied = []
     files_to_copy.each do |file|
-      src = File.join(extract_dir, file)
+      src = File.join(repo_dir, file)
       dst = File.join(QUICKJS_EXT_DIR, file)
 
       next unless File.exist?(src)
@@ -232,8 +223,8 @@ task :update_quickjs do
   puts "  4. Run benchmarks: rake benchmark"
   puts "  5. If everything works, commit and remove backup: rm -rf #{backup_dir}"
   puts ""
-  puts "NOTE: To update to a different version, edit QUICKJS_URL in Rakefile"
-  puts "See available versions at: https://bellard.org/quickjs/"
+  puts "NOTE: This task pulls from the latest master branch"
+  puts "Repository: #{quickjs_git_repo}"
 end
 
 # Default: clean, compile, test
