@@ -99,7 +99,7 @@ class TestQuickJS < Minitest::Test
   def test_memory_limit_validation
     # memory_limit cannot be less than 100000 bytes (required for QuickJS stdlib initialization)
     error = assert_raises(QuickJS::ArgumentError) do
-      QuickJS::Sandbox.new(memory_limit: 50000)
+      QuickJS::Sandbox.new(memory_limit: 50_000)
     end
     assert_match(/memory_limit cannot be less than 100000/i, error.message)
     assert_match(/50000/, error.message)

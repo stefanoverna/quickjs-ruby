@@ -14,7 +14,7 @@ def test(description)
   result = yield
   puts "  \u2713 #{description}: #{result.inspect}"
   result
-rescue => e
+rescue StandardError => e
   puts "  \u2717 #{description}: #{e.class.name.split('::').last} - #{e.message.lines.first&.strip}"
   nil
 end
@@ -22,10 +22,10 @@ end
 def section(title)
   puts "\n#{'=' * 70}"
   puts title
-  puts '=' * 70
+  puts "=" * 70
 end
 
-sandbox = QuickJS::Sandbox.new
+QuickJS::Sandbox.new
 
 # ============================================================================
 section "DATE API"
@@ -157,7 +157,7 @@ section "JSON"
 # ============================================================================
 
 test("JSON.parse") { QuickJS.eval('JSON.parse(\'{"a": 1}\')').value }
-test("JSON.stringify") { QuickJS.eval('JSON.stringify({a: 1})').value }
+test("JSON.stringify") { QuickJS.eval("JSON.stringify({a: 1})").value }
 test("JSON.stringify(function)") { QuickJS.eval("JSON.stringify({f: function(){}})").value }
 test("JSON.stringify(undefined)") { QuickJS.eval("JSON.stringify({a: undefined, b: 1})").value }
 test("JSON.stringify circular") { QuickJS.eval("var o = {}; o.self = o; JSON.stringify(o)").value }
@@ -241,6 +241,6 @@ test("undefined") { QuickJS.eval("undefined").value }
 test("null") { QuickJS.eval("null").value }
 test("globalThis") { QuickJS.eval("typeof globalThis").value }
 
-puts "\n" + '=' * 70
+puts "\n#{'=' * 70}"
 puts "EXPLORATION COMPLETE"
-puts '=' * 70
+puts "=" * 70
