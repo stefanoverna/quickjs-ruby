@@ -7,22 +7,12 @@ This document describes how to build the quickjs-ruby gem from source.
 - Ruby 2.7 or higher
 - C compiler (gcc or clang)
 - Make
-- curl or wget (for downloading QuickJS source)
 
 ## Building the Native Extension
 
-### Step 1: Download QuickJS Source Code
+The QuickJS source files are included in the repository under `ext/quickjs/`.
 
-The gem requires the QuickJS source code to be present in `ext/quickjs/quickjs-src/`.
-
-```bash
-cd ext/quickjs/quickjs-src
-curl -L https://bellard.org/quickjs/quickjs-2024-01-13.tar.xz -o quickjs.tar.xz
-tar -xf quickjs.tar.xz --strip-components=1
-rm quickjs.tar.xz
-```
-
-### Step 2: Build the Extension
+### Step 1: Build the Extension
 
 ```bash
 cd ext/quickjs
@@ -32,11 +22,11 @@ make
 
 This will:
 1. Generate a Makefile based on your system configuration
-2. Compile QuickJS source files (quickjs.c, libregexp.c, libunicode.c, cutils.c, libbf.c)
+2. Compile QuickJS source files (quickjs.c, libregexp.c, libunicode.c, cutils.c, dtoa.c, quickjs-libc.c)
 3. Compile the Ruby extension wrapper (quickjs_ext.c)
 4. Link everything into `quickjs_native.so`
 
-### Step 3: Copy the Extension (for Development)
+### Step 2: Copy the Extension (for Development)
 
 For development/testing, copy the compiled extension to the lib directory:
 
@@ -44,7 +34,7 @@ For development/testing, copy the compiled extension to the lib directory:
 cp quickjs_native.so ../../lib/quickjs/
 ```
 
-### Step 4: Test the Installation
+### Step 3: Test the Installation
 
 ```bash
 cd ../..  # Back to project root
@@ -63,6 +53,16 @@ rake compile
 rake test
 ```
 
+## Updating QuickJS
+
+To update QuickJS to the latest version from upstream:
+
+```bash
+rake update_quickjs
+```
+
+This will clone the latest QuickJS from GitHub and copy the needed files.
+
 ## Key Differences from MicroQuickJS
 
 This gem wraps the **full QuickJS engine**, not MicroQuickJS. Key differences:
@@ -72,18 +72,11 @@ This gem wraps the **full QuickJS engine**, not MicroQuickJS. Key differences:
    - Minimum recommended: 100KB (vs 10KB for MicroQuickJS)
 
 2. **Features**: Full QuickJS includes:
-   - BigInt/BigFloat support (via libbf.c)
+   - BigInt support
    - Complete ES2020+ support
    - More comprehensive standard library
 
-3. **Source Files**: Requires compiling additional files:
-   - `libbf.c` - BigNum library (not needed in MicroQuickJS)
-
 ## Troubleshooting
-
-### Symbol Errors (e.g., `undefined symbol: bf_context_init`)
-
-This means `libbf.c` wasn't compiled. Make sure your `extconf.rb` includes it in the source list.
 
 ### Memory Errors on Simple Scripts
 
@@ -93,12 +86,31 @@ If simple scripts like `1 + 1` fail with errors, the memory limit is too low. Qu
 
 1. Make sure you have a C compiler installed: `gcc --version` or `clang --version`
 2. Verify Ruby development headers are installed: `ruby -rrbconfig -e "puts RbConfig::CONFIG['includedir']"`
-3. Check that QuickJS source was downloaded correctly: `ls ext/quickjs/quickjs-src/quickjs.c`
+3. Check that QuickJS source is present: `ls ext/quickjs/quickjs.c`
+
+### CGI Class Variable Error (`uninitialized class variable @@accept_charset`)
+
+If you see this error when running `bundle install` or other bundler commands:
+
+```
+uninitialized class variable @@accept_charset in #<Class:CGI> (NameError)
+```
+
+This is a known Ruby bug where the CGI library isn't properly initialized when loaded indirectly by gems. The workaround is to pre-load the CGI library using `RUBYOPT`:
+
+```bash
+RUBYOPT="-rcgi" bundle install
+RUBYOPT="-rcgi" rake compile
+RUBYOPT="-rcgi" rake test
+```
+
+This ensures the CGI library is fully loaded before any gems that might trigger the issue.
 
 ## Files Overview
 
 - `ext/quickjs/extconf.rb` - Build configuration
 - `ext/quickjs/quickjs_ext.c` - C extension implementation
-- `ext/quickjs/quickjs-src/` - QuickJS source code (downloaded separately)
+- `ext/quickjs/quickjs.c` - Main QuickJS engine source
+- `ext/quickjs/*.c` - Other QuickJS source files
 - `lib/quickjs.rb` - Ruby interface
 - `lib/quickjs/*.rb` - Ruby classes (Sandbox, Result, Errors, etc.)

@@ -5,7 +5,7 @@ require 'mkmf'
 # Add compilation flags
 $CFLAGS << ' -std=gnu99 -Wall -Wextra -Wno-unused-parameter'
 $CFLAGS << ' -D_GNU_SOURCE'  # For asprintf
-$CFLAGS << ' -DCONFIG_VERSION=\"2024-12-22\"'  # QuickJS version
+$CFLAGS << ' -DCONFIG_VERSION=\"2025-12-22\"'  # QuickJS version
 
 # Source files to compile
 # - quickjs_ext.c: Our Ruby extension wrapper
@@ -16,7 +16,7 @@ $srcs = %w[
   libregexp.c
   libunicode.c
   cutils.c
-  libbf.c
+  dtoa.c
   quickjs-libc.c
 ]
 $objs = $srcs.map { |f| f.sub(/\.c$/, '.o') }

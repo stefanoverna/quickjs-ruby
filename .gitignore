@@ -13,13 +13,9 @@ ext/quickjs/*.bundle
 ext/quickjs/.sitearchdir.*
 lib/quickjs/quickjs_native.bundle
 
-# QuickJS source files copied during build (originals are in quickjs-src/)
-ext/quickjs/*.c
-ext/quickjs/*.h
-
-# Keep our Ruby extension files
-!ext/quickjs/extconf.rb
-!ext/quickjs/quickjs_ext.c
+# Build-generated files in ext/quickjs (keep source files tracked)
+ext/quickjs/Makefile
+ext/quickjs/mkmf.log
 
 # Gemfile.lock (for gems, not applications)
 Gemfile.lock
