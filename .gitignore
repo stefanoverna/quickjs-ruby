@@ -14,18 +14,8 @@ ext/quickjs/.sitearchdir.*
 lib/quickjs/quickjs_native.bundle
 
 # QuickJS source files copied during build (originals are in quickjs-src/)
-ext/quickjs/quickjs.c
-ext/quickjs/quickjs.h
-ext/quickjs/quickjs-*.h
-ext/quickjs/libregexp.c
-ext/quickjs/libregexp.h
-ext/quickjs/libunicode.c
-ext/quickjs/libunicode.h
-ext/quickjs/cutils.c
-ext/quickjs/cutils.h
-ext/quickjs/libbf.c
-ext/quickjs/libbf.h
-ext/quickjs/list.h
+ext/quickjs/*.c
+ext/quickjs/*.h
 
 # Keep our Ruby extension files
 !ext/quickjs/extconf.rb
