@@ -77,71 +77,84 @@ end
 
 # Update quickjs from upstream
 # Configuration constants
-MQUICKJS_GITHUB_REPO = "https://github.com/bellard/quickjs.git"
-MQUICKJS_EXT_DIR = "ext/quickjs"
+QUICKJS_URL = "https://bellard.org/quickjs/quickjs-2024-01-13.tar.xz"
+QUICKJS_EXT_DIR = "ext/quickjs"
 
 # Files to EXCLUDE from the upstream copy (Ruby-specific or not needed)
-MQUICKJS_EXCLUDE_FILES = %w[
+QUICKJS_EXCLUDE_FILES = %w[
   quickjs_ext.c
   quickjs_wrapper.h
   extconf.rb
-  mqjs.c
-  readline.c
-  readline.h
-  readline_tty.c
-  readline_tty.h
-  example.c
-  example_stdlib.c
+  qjs.c
+  qjsc.c
+  run-test262.c
+  repl.c
+  repl.js
+  unicode_gen.c
+  libunicode-table.h
 ].freeze
 
-# Generated files that will be recreated during build (backup but don't copy from upstream)
-MQUICKJS_GENERATED_FILES = %w[
-  quickjs_atom.h
-  mqjs_stdlib.h
-].freeze
-
-desc "Update quickjs to the latest version from GitHub"
+desc "Update QuickJS to the latest version from bellard.org"
 task :update_quickjs do
   require "fileutils"
   require "tmpdir"
+  require "open-uri"
 
-  puts "Updating quickjs from upstream repository..."
-  puts "Source: #{MQUICKJS_GITHUB_REPO}"
+  puts "Updating QuickJS from upstream..."
+  puts "Source: #{QUICKJS_URL}"
   puts ""
 
   # Create backup directory
   timestamp = Time.now.strftime("%Y%m%d_%H%M%S")
-  backup_dir = "#{MQUICKJS_EXT_DIR}/backup_#{timestamp}"
+  backup_dir = "#{QUICKJS_EXT_DIR}/backup_#{timestamp}"
   FileUtils.mkdir_p(backup_dir)
   puts "Creating backup in #{backup_dir}..."
 
   # Backup all existing C/H files
-  Dir.glob("#{MQUICKJS_EXT_DIR}/*.{c,h}").each do |file|
+  Dir.glob("#{QUICKJS_EXT_DIR}/*.{c,h}").each do |file|
     FileUtils.cp(file, backup_dir)
   end
 
   puts ""
-  puts "Cloning quickjs repository..."
+  puts "Downloading QuickJS tarball..."
 
-  # Clone the repository to a temp directory
+  # Download and extract to a temp directory
   Dir.mktmpdir do |tmp_dir|
-    clone_dir = File.join(tmp_dir, "quickjs")
+    tarball_path = File.join(tmp_dir, "quickjs.tar.xz")
+    extract_dir = File.join(tmp_dir, "quickjs")
 
-    # Clone the repository
-    unless system("git clone --depth 1 --quiet #{MQUICKJS_GITHUB_REPO} #{clone_dir}")
-      puts "Failed to clone repository. Restoring from backup..."
-      FileUtils.cp(Dir.glob("#{backup_dir}/*"), MQUICKJS_EXT_DIR)
-      abort "Update failed: Could not clone repository"
+    # Download the tarball
+    begin
+      URI.open(QUICKJS_URL) do |remote|
+        File.open(tarball_path, "wb") do |local|
+          local.write(remote.read)
+        end
+      end
+    rescue StandardError => e
+      puts "Failed to download tarball: #{e.message}"
+      puts "Restoring from backup..."
+      FileUtils.cp(Dir.glob("#{backup_dir}/*"), QUICKJS_EXT_DIR)
+      abort "Update failed: Could not download QuickJS"
+    end
+
+    puts "Extracting tarball..."
+
+    # Extract the tarball
+    FileUtils.mkdir_p(extract_dir)
+    unless system("tar -xf #{tarball_path} -C #{extract_dir} --strip-components=1")
+      puts "Failed to extract tarball. Restoring from backup..."
+      FileUtils.cp(Dir.glob("#{backup_dir}/*"), QUICKJS_EXT_DIR)
+      abort "Update failed: Could not extract tarball"
     end
 
     puts "Copying updated files..."
     puts ""
 
-    # Get all C and H files from the cloned repo
-    upstream_files = Dir.glob("#{clone_dir}/*.{c,h}").map { |f| File.basename(f) }
+    # Get all C and H files from the extracted directory
+    upstream_files = Dir.glob("#{extract_dir}/*.{c,h}").map { |f| File.basename(f) }
 
     # Filter out excluded files
-    files_to_copy = upstream_files - MQUICKJS_EXCLUDE_FILES - MQUICKJS_GENERATED_FILES
+    files_to_copy = upstream_files - QUICKJS_EXCLUDE_FILES
 
     if files_to_copy.empty?
       puts "No files to copy!"
@@ -151,8 +164,8 @@ task :update_quickjs do
     # Copy files
     copied = []
     files_to_copy.each do |file|
-      src = File.join(clone_dir, file)
-      dst = File.join(MQUICKJS_EXT_DIR, file)
+      src = File.join(extract_dir, file)
+      dst = File.join(QUICKJS_EXT_DIR, file)
 
       next unless File.exist?(src)
 
@@ -172,17 +185,13 @@ task :update_quickjs do
     puts ""
 
     # Show which files were excluded
-    puts "Excluded files (Ruby-specific):"
-    MQUICKJS_EXCLUDE_FILES.each { |f| puts "  - #{f}" }
-    puts ""
-
-    puts "Generated files (will be recreated during build):"
-    MQUICKJS_GENERATED_FILES.each { |f| puts "  - #{f}" }
+    puts "Excluded files (Ruby-specific or not needed):"
+    QUICKJS_EXCLUDE_FILES.each { |f| puts "  - #{f}" }
     puts ""
 
     # Check for files that were in backup but not copied (potentially removed upstream)
     removed_files = Dir.glob("#{backup_dir}/*.{c,h}").map { |f| File.basename(f) } -
-                    copied - MQUICKJS_EXCLUDE_FILES - MQUICKJS_GENERATED_FILES
+                    copied - QUICKJS_EXCLUDE_FILES
 
     if removed_files.any?
       puts "WARNING: These files exist locally but not in upstream:"
@@ -193,7 +202,7 @@ task :update_quickjs do
   end
 
   # Apply custom patches
-  patches_dir = File.join(MQUICKJS_EXT_DIR, "patches")
+  patches_dir = File.join(QUICKJS_EXT_DIR, "patches")
   if Dir.exist?(patches_dir)
     patch_files = Dir.glob(File.join(patches_dir, "*.patch")).sort
 
@@ -223,10 +232,8 @@ task :update_quickjs do
   puts "  4. Run benchmarks: rake benchmark"
   puts "  5. If everything works, commit and remove backup: rm -rf #{backup_dir}"
   puts ""
-  puts "Note: Generated files (quickjs_atom.h, mqjs_stdlib.h) will be"
-  puts "recreated automatically during the next build (step 2)."
-  puts ""
-  puts "Custom patches from ext/quickjs/patches/ have been applied."
+  puts "NOTE: To update to a different version, edit QUICKJS_URL in Rakefile"
+  puts "See available versions at: https://bellard.org/quickjs/"
 end
 
 # Default: clean, compile, test

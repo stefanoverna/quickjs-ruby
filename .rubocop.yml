@@ -1,0 +1,45 @@
+plugins:
+  - rubocop-minitest
+  - rubocop-rake
+
+AllCops:
+  TargetRubyVersion: 2.7
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - 'vendor/**/*'
+    - 'ext/**/*'
+    - 'tmp/**/*'
+    - 'benchmark/**/*'
+
+# Style preferences
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/Documentation:
+  Enabled: false
+
+# Metrics
+Metrics:
+  Enabled: false
+
+# Minitest
+Minitest/MultipleAssertions:
+  Enabled: false
+
+# Naming
+Naming/VariableNumber:
+  Exclude:
+    - "test/**/*"
+
+# Layout preferences
+Layout/LineLength:
+  Max: 120
+  Exclude:
+    - "quickjs.gemspec"
+
+# Exception classes use positional arguments because the C extension
+# calls rb_class_new_instance with positional arguments
+Style/OptionalBooleanParameter:
+  Exclude:
+    - "lib/quickjs/errors.rb"
