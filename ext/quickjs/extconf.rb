@@ -21,6 +21,7 @@ quickjs_sources = %w[
   libregexp.c
   libunicode.c
   cutils.c
+  libbf.c
 ].map { |f| File.join(QUICKJS_DIR, f) }
 
 # Add QuickJS sources to the source list

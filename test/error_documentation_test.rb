@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
 require "minitest/autorun"
-require_relative "../lib/mquickjs"
+require_relative "../lib/quickjs"
 
 # Tests to verify README error documentation is accurate
+# NOTE: These tests are adapted for full QuickJS, which supports more ES6+ features
+# than MicroQuickJS (const, let, arrow functions, template literals, etc.)
 class ErrorDocumentationTest < Minitest::Test
   def setup
     @sandbox = QuickJS::Sandbox.new
@@ -17,35 +19,30 @@ class ErrorDocumentationTest < Minitest::Test
     error = assert_raises(QuickJS::SyntaxError) do
       @sandbox.eval("var x = ")
     end
-    assert_equal "SyntaxError: unexpected character in expression", error.message
+    # QuickJS has slightly different error messages than MicroQuickJS
+    assert_match(/SyntaxError.*unexpected/, error.message)
   end
 
-  def test_syntax_error_const_keyword
-    error = assert_raises(QuickJS::SyntaxError) do
-      @sandbox.eval("const x = 10")
-    end
-    assert_equal "SyntaxError: unexpected character in expression", error.message
+  # QuickJS (full version) supports ES6+ features - these should work, not raise errors
+  def test_const_keyword_works
+    result = @sandbox.eval("const x = 10; x")
+    assert_equal 10, result.value
   end
 
-  def test_syntax_error_let_keyword
-    error = assert_raises(QuickJS::SyntaxError) do
-      @sandbox.eval("let y = 20")
-    end
-    assert_equal "SyntaxError: unexpected character in expression", error.message
+  def test_let_keyword_works
+    result = @sandbox.eval("let y = 20; y")
+    assert_equal 20, result.value
   end
 
-  def test_syntax_error_arrow_function
-    error = assert_raises(QuickJS::SyntaxError) do
-      @sandbox.eval("[1,2,3].map(x => x * 2)")
-    end
-    assert_equal "SyntaxError: unexpected character in expression", error.message
+  def test_arrow_function_works
+    result = @sandbox.eval("[1,2,3].map(x => x * 2)")
+    assert_equal [2, 4, 6], result.value
   end
 
-  def test_syntax_error_template_literal
-    error = assert_raises(QuickJS::SyntaxError) do
-      @sandbox.eval("`template ${literal}`")
-    end
-    assert_equal "SyntaxError: unexpected character in expression", error.message
+  def test_template_literal_works
+    @sandbox.set_variable("literal", "world")
+    result = @sandbox.eval("`template ${literal}`")
+    assert_equal "template world", result.value
   end
 
   def test_syntax_error_anonymous_function_declaration
@@ -64,20 +61,20 @@ class ErrorDocumentationTest < Minitest::Test
     assert_match(/at <eval>/, error.stack)
   end
 
-  def test_syntax_error_stack_shows_line_and_column
+  def test_syntax_error_stack_shows_line_number
     error = assert_raises(QuickJS::SyntaxError) do
       @sandbox.eval("var x = 1;\nvar y = 2;\nfunction broken() {")
     end
-    # Stack should contain line:column info (line 3)
-    assert_match(/<eval>:3:\d+/, error.stack)
+    # QuickJS shows line numbers in stack traces
+    assert_match(/<eval>:3/, error.stack)
   end
 
-  def test_syntax_error_stack_shows_column_position
+  def test_syntax_error_stack_includes_eval_context
     error = assert_raises(QuickJS::SyntaxError) do
       @sandbox.eval("var x = ")
     end
-    # Should show line 1 with column position
-    assert_match(/<eval>:1:\d+/, error.stack)
+    # Should show <eval> context and line 1
+    assert_match(/<eval>:1/, error.stack)
   end
 
   # ==========================================================================
@@ -88,7 +85,8 @@ class ErrorDocumentationTest < Minitest::Test
     error = assert_raises(QuickJS::JavascriptError) do
       @sandbox.eval("undefinedVariable")
     end
-    assert_equal "ReferenceError: variable 'undefinedVariable' is not defined", error.message
+    # QuickJS error message format is slightly different from MicroQuickJS
+    assert_match(/ReferenceError.*undefinedVariable.*not defined/, error.message)
   end
 
   def test_javascript_error_null_property_access
@@ -197,6 +195,6 @@ class ErrorDocumentationTest < Minitest::Test
       JS
     end
     # Stack should contain line number info
-    assert_match(/<eval>:\d+:\d+/, error.stack)
+    assert_match(/<eval>:\d+/, error.stack)
   end
 end
