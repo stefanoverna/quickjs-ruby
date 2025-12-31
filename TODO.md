@@ -108,32 +108,9 @@ Should instruct users that QuickJS source will be downloaded automatically durin
 
 Currently, users must manually download QuickJS source. This should be automated.
 
-**Options:**
-
-**Option A: Download in extconf.rb**
-```ruby
-# In extconf.rb, before compilation:
-unless File.exist?(File.join(QUICKJS_DIR, 'quickjs.c'))
-  require 'open-uri'
-  puts "Downloading QuickJS source..."
-  # Download and extract
-end
-```
-
-**Option B: Rake task**
-```ruby
-# In Rakefile
-task :download_quickjs do
-  # Download logic
-end
-```
-
-**Option C: Vendored source**
 - Include QuickJS source directly in the gem
 - Increases gem size significantly
 - No download required
-
-**Recommendation:** Option A (download in extconf.rb) for automatic installation
 
 ---
 
@@ -200,6 +177,12 @@ jobs:
 - [ ] Large object/array handling
 - [ ] Nested function call limits
 - [ ] Error message consistency across QuickJS versions
+
+---
+
+### 9. Double check that everything is setup like mquickjs-ruby
+
+Clone https://github.com/stefanoverna/mquickjs-ruby.git and make sure to "copy and adapt" Rakefile, UPDATING_MQUICKJS.md, .github/workflows, and anything else you can find that it's different without a real reason.
 
 ---
 
