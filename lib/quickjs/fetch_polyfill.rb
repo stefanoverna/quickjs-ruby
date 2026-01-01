@@ -4,7 +4,7 @@ module QuickJS
   # JavaScript polyfills for the Fetch API
   # These provide standard Headers, Request, and Response classes
   module FetchPolyfill
-    HEADERS_CLASS = <<~'JS'
+    HEADERS_CLASS = <<~JS
       (function() {
         if (typeof Headers !== 'undefined') return;
 
@@ -73,7 +73,7 @@ module QuickJS
       })();
     JS
 
-    RESPONSE_CLASS = <<~'JS'
+    RESPONSE_CLASS = <<~JS
       (function() {
         if (typeof Response !== 'undefined') return;
 
@@ -179,7 +179,7 @@ module QuickJS
       })();
     JS
 
-    REQUEST_CLASS = <<~'JS'
+    REQUEST_CLASS = <<~JS
       (function() {
         if (typeof Request !== 'undefined') return;
 
@@ -277,7 +277,7 @@ module QuickJS
       })();
     JS
 
-    FETCH_WRAPPER = <<~'JS'
+    FETCH_WRAPPER = <<~JS
       (function() {
         // Store reference to native fetch
         var nativeFetch = globalThis.fetch;

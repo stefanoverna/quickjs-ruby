@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require "minitest/autorun"
-require_relative "../lib/quickjs"
+require_relative "test_helper"
 
 class FetchPolyfillTest < Minitest::Test
   def setup
@@ -87,6 +86,7 @@ class FetchPolyfillTest < Minitest::Test
       ])
     JS
     values = JSON.parse(result.value)
+
     assert_equal "text/html", values[0]
     assert_equal "text/html", values[1]
     assert_equal "text/html", values[2]
@@ -107,6 +107,7 @@ class FetchPolyfillTest < Minitest::Test
       })
     JS
     data = JSON.parse(result.value)
+
     assert_equal 200, data["status"]
     assert_equal "", data["statusText"]
     assert data["ok"]
@@ -134,6 +135,7 @@ class FetchPolyfillTest < Minitest::Test
       })
     JS
     data = JSON.parse(result.value)
+
     assert_equal 404, data["status"]
     assert_equal "Not Found", data["statusText"]
     refute data["ok"]
@@ -149,13 +151,14 @@ class FetchPolyfillTest < Minitest::Test
       JSON.stringify(results)
     JS
     data = JSON.parse(result.value)
-    assert_equal false, data[0]["ok"] # 199
-    assert_equal true, data[1]["ok"]  # 200
-    assert_equal true, data[2]["ok"]  # 201
-    assert_equal true, data[3]["ok"]  # 299
-    assert_equal false, data[4]["ok"] # 300
-    assert_equal false, data[5]["ok"] # 400
-    assert_equal false, data[6]["ok"] # 500
+
+    refute data[0]["ok"] # 199
+    assert data[1]["ok"]  # 200
+    assert data[2]["ok"]  # 201
+    assert data[3]["ok"]  # 299
+    refute data[4]["ok"] # 300
+    refute data[5]["ok"] # 400
+    refute data[6]["ok"] # 500
   end
 
   def test_response_text_method_returns_promise
@@ -226,11 +229,12 @@ class FetchPolyfillTest < Minitest::Test
       })
     JS
     data = JSON.parse(result.value)
+
     assert data["sameBody"]
     assert_equal 201, data["clonedStatus"]
     assert_equal "Created", data["clonedStatusText"]
-    assert_equal false, data["originalBodyUsed"]
-    assert_equal false, data["clonedBodyUsed"]
+    refute data["originalBodyUsed"]
+    refute data["clonedBodyUsed"]
   end
 
   def test_response_clone_cannot_clone_used_body
@@ -265,6 +269,7 @@ class FetchPolyfillTest < Minitest::Test
       })
     JS
     data = JSON.parse(result.value)
+
     assert_equal 0, data["status"]
     assert_equal "error", data["type"]
   end
@@ -278,6 +283,7 @@ class FetchPolyfillTest < Minitest::Test
       })
     JS
     data = JSON.parse(result.value)
+
     assert_equal 301, data["status"]
     assert_equal "https://example.com", data["location"]
   end
@@ -299,6 +305,7 @@ class FetchPolyfillTest < Minitest::Test
       })()
     JS
     data = JSON.parse(result.value)
+
     assert_equal 65, data[0] # 'A'
     assert_equal 66, data[1] # 'B'
     assert_equal 67, data[2] # 'C'
@@ -318,6 +325,7 @@ class FetchPolyfillTest < Minitest::Test
       })
     JS
     data = JSON.parse(result.value)
+
     assert_equal "https://example.com/api", data["url"]
     assert_equal "GET", data["method"]
   end
@@ -339,6 +347,7 @@ class FetchPolyfillTest < Minitest::Test
       JSON.stringify(normalized)
     JS
     expected = %w[GET POST PUT DELETE PATCH HEAD OPTIONS]
+
     assert_equal expected, JSON.parse(result.value)
   end
 
@@ -382,6 +391,7 @@ class FetchPolyfillTest < Minitest::Test
       ])
     JS
     data = JSON.parse(result.value)
+
     assert_equal "application/json", data[0]
     assert_equal "Bearer token", data[1]
   end
@@ -402,6 +412,7 @@ class FetchPolyfillTest < Minitest::Test
       })
     JS
     data = JSON.parse(result.value)
+
     assert_equal "https://example.com", data["url"]
     assert_equal "POST", data["method"]
     assert_equal "test body", data["body"]
@@ -418,6 +429,7 @@ class FetchPolyfillTest < Minitest::Test
       })
     JS
     data = JSON.parse(result.value)
+
     assert_equal "https://example.com", data["url"]
     assert_equal "POST", data["method"]
   end
@@ -432,6 +444,7 @@ class FetchPolyfillTest < Minitest::Test
       })
     JS
     data = JSON.parse(result.value)
+
     assert_equal "POST", data["originalMethod"]
     assert_equal "PUT", data["modifiedMethod"]
   end
@@ -596,9 +609,10 @@ class FetchPolyfillTest < Minitest::Test
       })()
     JS
     data = JSON.parse(result.value)
+
     assert_equal 404, data["status"]
     assert_equal "Not Found", data["statusText"]
-    assert_equal false, data["ok"]
+    refute data["ok"]
   end
 
   # ============================================================================
@@ -607,6 +621,7 @@ class FetchPolyfillTest < Minitest::Test
 
   def test_promise_resolve
     result = @sandbox.eval("Promise.resolve(42)")
+
     assert_equal 42, result.value
   end
 
@@ -635,43 +650,5 @@ class FetchPolyfillTest < Minitest::Test
       @sandbox.eval("Promise.reject(new Error('test error'))")
     end
     assert_match(/test error/i, error.message)
-  end
-end
-
-# Mock HTTP sandbox helper (copied from fetch_test.rb for standalone execution)
-class MockHTTPSandbox
-  attr_reader :requests
-
-  def initialize
-    @requests = []
-    @responses = []
-  end
-
-  def queue_response(response)
-    @responses << response
-  end
-
-  def default_response
-    {
-      status: 200,
-      statusText: "OK",
-      body: '{"message": "success"}',
-      headers: { "content-type" => "application/json" }
-    }
-  end
-
-  def create_sandbox
-    sandbox = QuickJS::Sandbox.new
-
-    requests = @requests
-    responses = @responses
-    default = method(:default_response)
-
-    sandbox.instance_variable_get(:@native_sandbox).http_callback = lambda do |method, url, body, headers|
-      requests << { method: method, url: url, body: body, headers: headers }
-      responses.shift || default.call
-    end
-
-    sandbox
   end
 end
