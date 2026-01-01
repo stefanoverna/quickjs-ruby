@@ -58,7 +58,12 @@ class FetchTest < Minitest::Test
   # ============================================================================
 
   def test_basic_get_request
-    result = @sandbox.eval("fetch('https://api.example.com/data').body")
+    result = @sandbox.eval(<<~JS)
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        return response.body;
+      })()
+    JS
 
     assert_equal '{"message": "success"}', result.value
     assert_equal 1, @mock.requests.length
@@ -68,7 +73,10 @@ class FetchTest < Minitest::Test
 
   def test_post_request
     result = @sandbox.eval(<<~JS)
-      fetch('https://api.example.com/users', { method: 'POST' }).status
+      (async () => {
+        var response = await fetch('https://api.example.com/users', { method: 'POST' });
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
@@ -77,7 +85,10 @@ class FetchTest < Minitest::Test
 
   def test_put_request
     result = @sandbox.eval(<<~JS)
-      fetch('https://api.example.com/users/1', { method: 'PUT' }).status
+      (async () => {
+        var response = await fetch('https://api.example.com/users/1', { method: 'PUT' });
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
@@ -86,7 +97,10 @@ class FetchTest < Minitest::Test
 
   def test_delete_request
     result = @sandbox.eval(<<~JS)
-      fetch('https://api.example.com/users/1', { method: 'DELETE' }).status
+      (async () => {
+        var response = await fetch('https://api.example.com/users/1', { method: 'DELETE' });
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
@@ -95,7 +109,10 @@ class FetchTest < Minitest::Test
 
   def test_patch_request
     result = @sandbox.eval(<<~JS)
-      fetch('https://api.example.com/users/1', { method: 'PATCH' }).status
+      (async () => {
+        var response = await fetch('https://api.example.com/users/1', { method: 'PATCH' });
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
@@ -104,7 +121,10 @@ class FetchTest < Minitest::Test
 
   def test_head_request
     result = @sandbox.eval(<<~JS)
-      fetch('https://api.example.com/data', { method: 'HEAD' }).status
+      (async () => {
+        var response = await fetch('https://api.example.com/data', { method: 'HEAD' });
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
@@ -113,7 +133,10 @@ class FetchTest < Minitest::Test
 
   def test_options_request
     result = @sandbox.eval(<<~JS)
-      fetch('https://api.example.com/data', { method: 'OPTIONS' }).status
+      (async () => {
+        var response = await fetch('https://api.example.com/data', { method: 'OPTIONS' });
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
@@ -126,10 +149,13 @@ class FetchTest < Minitest::Test
 
   def test_request_with_string_body
     result = @sandbox.eval(<<~JS)
-      fetch('https://api.example.com/users', {
-        method: 'POST',
-        body: 'plain text body'
-      }).status
+      (async () => {
+        var response = await fetch('https://api.example.com/users', {
+          method: 'POST',
+          body: 'plain text body'
+        });
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
@@ -138,10 +164,13 @@ class FetchTest < Minitest::Test
 
   def test_request_with_json_body
     result = @sandbox.eval(<<~JS)
-      fetch('https://api.example.com/users', {
-        method: 'POST',
-        body: JSON.stringify({name: 'John', age: 30})
-      }).status
+      (async () => {
+        var response = await fetch('https://api.example.com/users', {
+          method: 'POST',
+          body: JSON.stringify({name: 'John', age: 30})
+        });
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
@@ -150,7 +179,10 @@ class FetchTest < Minitest::Test
 
   def test_request_without_body
     result = @sandbox.eval(<<~JS)
-      fetch('https://api.example.com/data').status
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
@@ -164,7 +196,12 @@ class FetchTest < Minitest::Test
   def test_response_status
     @mock.queue_response(status: 201, statusText: "Created", body: "", headers: {})
 
-    result = @sandbox.eval("fetch('https://api.example.com/users').status")
+    result = @sandbox.eval(<<~JS)
+      (async () => {
+        var response = await fetch('https://api.example.com/users');
+        return response.status;
+      })()
+    JS
 
     assert_equal 201, result.value
   end
@@ -172,7 +209,12 @@ class FetchTest < Minitest::Test
   def test_response_status_text
     @mock.queue_response(status: 404, statusText: "Not Found", body: "", headers: {})
 
-    result = @sandbox.eval("fetch('https://api.example.com/users').statusText")
+    result = @sandbox.eval(<<~JS)
+      (async () => {
+        var response = await fetch('https://api.example.com/users');
+        return response.statusText;
+      })()
+    JS
 
     assert_equal "Not Found", result.value
   end
@@ -180,7 +222,12 @@ class FetchTest < Minitest::Test
   def test_response_ok_true_for_200
     @mock.queue_response(status: 200, statusText: "OK", body: "", headers: {})
 
-    result = @sandbox.eval("fetch('https://api.example.com/data').ok")
+    result = @sandbox.eval(<<~JS)
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        return response.ok;
+      })()
+    JS
 
     assert result.value
   end
@@ -188,7 +235,12 @@ class FetchTest < Minitest::Test
   def test_response_ok_false_for_404
     @mock.queue_response(status: 404, statusText: "Not Found", body: "", headers: {})
 
-    result = @sandbox.eval("fetch('https://api.example.com/data').ok")
+    result = @sandbox.eval(<<~JS)
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        return response.ok;
+      })()
+    JS
 
     refute result.value
   end
@@ -196,7 +248,12 @@ class FetchTest < Minitest::Test
   def test_response_body
     @mock.queue_response(status: 200, statusText: "OK", body: "Hello World", headers: {})
 
-    result = @sandbox.eval("fetch('https://api.example.com/data').body")
+    result = @sandbox.eval(<<~JS)
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        return response.body;
+      })()
+    JS
 
     assert_equal "Hello World", result.value
   end
@@ -210,14 +267,16 @@ class FetchTest < Minitest::Test
     )
 
     result = @sandbox.eval(<<~JS)
-      var response = fetch('https://api.example.com/users');
-      JSON.stringify({
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        body: response.body,
-        hasHeaders: typeof response.headers === 'object'
-      })
+      (async () => {
+        var response = await fetch('https://api.example.com/users');
+        return JSON.stringify({
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          body: response.body,
+          hasHeaders: typeof response.headers === 'object'
+        });
+      })()
     JS
 
     data = JSON.parse(result.value)
@@ -242,9 +301,11 @@ class FetchTest < Minitest::Test
     )
 
     result = @sandbox.eval(<<~JS)
-      var response = fetch('https://api.example.com/user');
-      var data = JSON.parse(response.body);
-      data.name
+      (async () => {
+        var response = await fetch('https://api.example.com/user');
+        var data = await response.json();
+        return data.name;
+      })()
     JS
 
     assert_equal "John", result.value
@@ -259,9 +320,11 @@ class FetchTest < Minitest::Test
     )
 
     result = @sandbox.eval(<<~JS)
-      var response = fetch('https://api.example.com/users');
-      var data = JSON.parse(response.body);
-      data.length
+      (async () => {
+        var response = await fetch('https://api.example.com/users');
+        var data = await response.json();
+        return data.length;
+      })()
     JS
 
     assert_equal 3, result.value
@@ -272,14 +335,24 @@ class FetchTest < Minitest::Test
   # ============================================================================
 
   def test_url_with_query_params
-    result = @sandbox.eval("fetch('https://api.example.com/search?q=test&limit=10').status")
+    result = @sandbox.eval(<<~JS)
+      (async () => {
+        var response = await fetch('https://api.example.com/search?q=test&limit=10');
+        return response.status;
+      })()
+    JS
 
     assert_equal 200, result.value
     assert_equal "https://api.example.com/search?q=test&limit=10", @mock.requests[0][:url]
   end
 
   def test_url_with_path_segments
-    result = @sandbox.eval("fetch('https://api.example.com/v1/users/123/posts').status")
+    result = @sandbox.eval(<<~JS)
+      (async () => {
+        var response = await fetch('https://api.example.com/v1/users/123/posts');
+        return response.status;
+      })()
+    JS
 
     assert_equal 200, result.value
     assert_equal "https://api.example.com/v1/users/123/posts", @mock.requests[0][:url]
@@ -318,10 +391,12 @@ class FetchTest < Minitest::Test
     @mock.queue_response(status: 202, statusText: "Accepted", body: "third", headers: {})
 
     result = @sandbox.eval(<<~JS)
-      var r1 = fetch('https://api.example.com/1');
-      var r2 = fetch('https://api.example.com/2');
-      var r3 = fetch('https://api.example.com/3');
-      r1.body + ',' + r2.body + ',' + r3.body
+      (async () => {
+        var r1 = await fetch('https://api.example.com/1');
+        var r2 = await fetch('https://api.example.com/2');
+        var r3 = await fetch('https://api.example.com/3');
+        return r1.body + ',' + r2.body + ',' + r3.body;
+      })()
     JS
 
     assert_equal "first,second,third", result.value
@@ -330,11 +405,13 @@ class FetchTest < Minitest::Test
 
   def test_request_in_function
     result = @sandbox.eval(<<~JS)
-      function getData(url) {
-        var response = fetch(url);
-        return response.body;
-      }
-      getData('https://api.example.com/data')
+      (async () => {
+        async function getData(url) {
+          var response = await fetch(url);
+          return response.body;
+        }
+        return await getData('https://api.example.com/data');
+      })()
     JS
 
     assert_equal '{"message": "success"}', result.value
@@ -346,12 +423,14 @@ class FetchTest < Minitest::Test
     @mock.queue_response(status: 200, statusText: "OK", body: "c", headers: {})
 
     result = @sandbox.eval(<<~JS)
-      var results = [];
-      for (var i = 0; i < 3; i++) {
-        var response = fetch('https://api.example.com/item/' + i);
-        results.push(response.body);
-      }
-      results.join(',')
+      (async () => {
+        var results = [];
+        for (var i = 0; i < 3; i++) {
+          var response = await fetch('https://api.example.com/item/' + i);
+          results.push(response.body);
+        }
+        return results.join(',');
+      })()
     JS
 
     assert_equal "a,b,c", result.value
@@ -364,9 +443,11 @@ class FetchTest < Minitest::Test
 
   def test_fetch_with_console_log
     result = @sandbox.eval(<<~JS)
-      var response = fetch('https://api.example.com/data');
-      console.log('Status:', response.status);
-      response.body
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        console.log('Status:', response.status);
+        return response.body;
+      })()
     JS
 
     assert_equal '{"message": "success"}', result.value
@@ -387,12 +468,42 @@ class FetchTest < Minitest::Test
     )
 
     result = @sandbox.eval(<<~JS)
-      var response = fetch('https://api.example.com/data');
-      var data = JSON.parse(response.body);
-      data.message
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        var data = await response.json();
+        return data.message;
+      })()
     JS
 
     assert_equal "こんにちは世界", result.value
+  end
+
+  # ============================================================================
+  # Async/Await and Promise Tests
+  # ============================================================================
+
+  def test_fetch_returns_promise
+    result = @sandbox.eval(<<~JS)
+      fetch('https://api.example.com/data') instanceof Promise
+    JS
+    assert result.value
+  end
+
+  def test_fetch_with_then_chain
+    result = @sandbox.eval(<<~JS)
+      fetch('https://api.example.com/data')
+        .then(response => response.json())
+        .then(data => data.message)
+    JS
+    assert_equal "success", result.value
+  end
+
+  def test_fetch_error_caught_with_catch
+    result = @sandbox.eval(<<~JS)
+      fetch()
+        .catch(e => e.message)
+    JS
+    assert_match(/requires at least 1 argument/i, result.value)
   end
 end
 

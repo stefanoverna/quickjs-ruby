@@ -615,6 +615,40 @@ static VALUE sandbox_eval(VALUE self, VALUE code) {
     JSValue result = JS_Eval(wrapper->ctx, code_str, strlen(code_str), "<eval>",
                             JS_EVAL_TYPE_GLOBAL);
 
+    // Execute pending jobs (Promise callbacks, etc.)
+    // This is required for async/await and Promise-based code to work
+    JSContext *ctx1;
+    int job_count = 0;
+    while (JS_ExecutePendingJob(wrapper->rt, &ctx1) > 0) {
+        job_count++;
+        // Check for timeout during job execution
+        if (wrapper->timeout_ms > 0) {
+            int64_t elapsed = get_time_ms() - wrapper->start_time_ms;
+            if (elapsed > wrapper->timeout_ms) {
+                wrapper->timed_out = 1;
+                break;
+            }
+        }
+    }
+
+    // If result is a Promise, unwrap the resolved/rejected value
+    if (!JS_IsException(result) && JS_IsObject(result)) {
+        JSPromiseStateEnum state = JS_PromiseState(wrapper->ctx, result);
+        if (state == JS_PROMISE_FULFILLED) {
+            // Get the resolved value
+            JSValue resolved = JS_PromiseResult(wrapper->ctx, result);
+            JS_FreeValue(wrapper->ctx, result);
+            result = resolved;
+        } else if (state == JS_PROMISE_REJECTED) {
+            // Get the rejection reason and convert to exception
+            JSValue reason = JS_PromiseResult(wrapper->ctx, result);
+            JS_FreeValue(wrapper->ctx, result);
+            JS_Throw(wrapper->ctx, reason);
+            result = JS_EXCEPTION;
+        }
+        // If still pending, return the Promise object as-is
+    }
+
     // Clear current wrapper
     current_wrapper = NULL;
 

@@ -265,35 +265,50 @@ For quickjs-ruby, **Option 2 (JavaScript Polyfill Layer)** is recommended becaus
 
 ### Features Implemented
 - ✅ `Headers` class with case-insensitive header management
-- ✅ `Response` class with `json()`, `text()`, `arrayBuffer()` methods
+- ✅ `Response` class with `json()`, `text()`, `arrayBuffer()` methods (all return Promises)
 - ✅ `Request` class with method normalization and body handling
-- ✅ Fetch wrapper returning proper Response objects
+- ✅ **Async fetch** - `fetch()` returns a Promise (supports `await` and `.then()`)
+- ✅ **Promise execution** - QuickJS job queue runs after eval for proper async support
+- ✅ **Promise unwrapping** - Resolved promises are automatically unwrapped in eval results
 - ✅ Graceful fallback for low-memory sandboxes (< 150KB)
-- ✅ Full backwards compatibility with existing code
+- ✅ Full backwards compatibility with existing code (`.body` still works synchronously)
 
 ### Usage Example
 
 ```javascript
-// Now works with proper Response methods
-var response = fetch('https://api.example.com/data');
+// Async/await pattern (recommended)
+(async () => {
+  var response = await fetch('https://api.example.com/data');
+  var data = await response.json();
+  console.log(data.name);
+})();
 
-// Use standard methods
-var data = response.json();
-console.log(data.name);
-
-// Or access body as text
-var text = response.text();
+// Promise chain pattern
+fetch('https://api.example.com/data')
+  .then(response => response.json())
+  .then(data => console.log(data.name));
 
 // Headers work properly
-var contentType = response.headers.get('content-type');
+(async () => {
+  var response = await fetch('https://api.example.com/data');
+  var contentType = response.headers.get('content-type');
+})();
 
 // Create requests with Request objects
-var request = new Request('https://api.example.com/users', {
-  method: 'POST',
-  body: JSON.stringify({ name: 'John' }),
-  headers: new Headers({ 'Content-Type': 'application/json' })
-});
-var response = fetch(request);
+(async () => {
+  var request = new Request('https://api.example.com/users', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'John' }),
+    headers: new Headers({ 'Content-Type': 'application/json' })
+  });
+  var response = await fetch(request);
+  var result = await response.json();
+})();
+
+// Error handling with catch
+fetch('https://api.example.com/data')
+  .then(response => response.json())
+  .catch(error => console.error('Failed:', error.message));
 ```
 
 ## References

@@ -158,7 +158,7 @@ class FetchPolyfillTest < Minitest::Test
     assert_equal false, data[6]["ok"] # 500
   end
 
-  def test_response_text_method
+  def test_response_text_method_returns_promise
     result = @sandbox.eval(<<~JS)
       var response = new Response('Hello World');
       response.text()
@@ -166,22 +166,36 @@ class FetchPolyfillTest < Minitest::Test
     assert_equal "Hello World", result.value
   end
 
-  def test_response_json_method
+  def test_response_text_with_await
     result = @sandbox.eval(<<~JS)
-      var response = new Response('{"name": "John", "age": 30}');
-      var data = response.json();
-      data.name + ' is ' + data.age
+      (async () => {
+        var response = new Response('Hello World');
+        return await response.text();
+      })()
+    JS
+    assert_equal "Hello World", result.value
+  end
+
+  def test_response_json_method_returns_promise
+    result = @sandbox.eval(<<~JS)
+      (async () => {
+        var response = new Response('{"name": "John", "age": 30}');
+        var data = await response.json();
+        return data.name + ' is ' + data.age;
+      })()
     JS
     assert_equal "John is 30", result.value
   end
 
   def test_response_body_used_tracking
     result = @sandbox.eval(<<~JS)
-      var response = new Response('test');
-      var before = response.bodyUsed;
-      response.text();
-      var after = response.bodyUsed;
-      JSON.stringify([before, after])
+      (async () => {
+        var response = new Response('test');
+        var before = response.bodyUsed;
+        await response.text();
+        var after = response.bodyUsed;
+        return JSON.stringify([before, after]);
+      })()
     JS
     assert_equal [false, true], JSON.parse(result.value)
   end
@@ -189,9 +203,11 @@ class FetchPolyfillTest < Minitest::Test
   def test_response_body_cannot_be_used_twice
     error = assert_raises(QuickJS::JavascriptError) do
       @sandbox.eval(<<~JS)
-        var response = new Response('test');
-        response.text();
-        response.text();
+        (async () => {
+          var response = new Response('test');
+          await response.text();
+          await response.text();
+        })()
       JS
     end
     assert_match(/already been consumed/i, error.message)
@@ -220,9 +236,11 @@ class FetchPolyfillTest < Minitest::Test
   def test_response_clone_cannot_clone_used_body
     error = assert_raises(QuickJS::JavascriptError) do
       @sandbox.eval(<<~JS)
-        var response = new Response('test');
-        response.text();
-        response.clone();
+        (async () => {
+          var response = new Response('test');
+          await response.text();
+          response.clone();
+        })()
       JS
     end
     assert_match(/cannot clone/i, error.message)
@@ -273,10 +291,12 @@ class FetchPolyfillTest < Minitest::Test
 
   def test_response_arraybuffer_method
     result = @sandbox.eval(<<~JS)
-      var response = new Response('ABC');
-      var buffer = response.arrayBuffer();
-      var view = new Uint8Array(buffer);
-      JSON.stringify([view[0], view[1], view[2], buffer.byteLength])
+      (async () => {
+        var response = new Response('ABC');
+        var buffer = await response.arrayBuffer();
+        var view = new Uint8Array(buffer);
+        return JSON.stringify([view[0], view[1], view[2], buffer.byteLength]);
+      })()
     JS
     data = JSON.parse(result.value)
     assert_equal 65, data[0] # 'A'
@@ -417,46 +437,76 @@ class FetchPolyfillTest < Minitest::Test
   end
 
   # ============================================================================
-  # Fetch with Polyfill Integration Tests
+  # Async Fetch Integration Tests
   # ============================================================================
 
-  def test_fetch_returns_response_object
+  def test_fetch_returns_promise
     mock = MockHTTPSandbox.new
     sandbox = mock.create_sandbox
 
     result = sandbox.eval(<<~JS)
-      var response = fetch('https://api.example.com/data');
-      response instanceof Response
+      var promise = fetch('https://api.example.com/data');
+      promise instanceof Promise
     JS
     assert result.value
   end
 
-  def test_fetch_response_has_json_method
+  def test_fetch_resolves_to_response
+    mock = MockHTTPSandbox.new
+    sandbox = mock.create_sandbox
+
+    result = sandbox.eval(<<~JS)
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        return response instanceof Response;
+      })()
+    JS
+    assert result.value
+  end
+
+  def test_fetch_with_await
     mock = MockHTTPSandbox.new
     mock.queue_response(status: 200, statusText: "OK", body: '{"name":"John"}', headers: {})
     sandbox = mock.create_sandbox
 
     result = sandbox.eval(<<~JS)
-      var response = fetch('https://api.example.com/data');
-      var data = response.json();
-      data.name
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        var data = await response.json();
+        return data.name;
+      })()
     JS
     assert_equal "John", result.value
   end
 
-  def test_fetch_response_has_text_method
+  def test_fetch_with_then
+    mock = MockHTTPSandbox.new
+    mock.queue_response(status: 200, statusText: "OK", body: '{"value":42}', headers: {})
+    sandbox = mock.create_sandbox
+
+    result = sandbox.eval(<<~JS)
+      fetch('https://api.example.com/data')
+        .then(response => response.json())
+        .then(data => data.value)
+    JS
+    assert_equal 42, result.value
+  end
+
+  def test_fetch_response_text_with_await
     mock = MockHTTPSandbox.new
     mock.queue_response(status: 200, statusText: "OK", body: "Hello World", headers: {})
     sandbox = mock.create_sandbox
 
     result = sandbox.eval(<<~JS)
-      var response = fetch('https://api.example.com/data');
-      response.text()
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        return await response.text();
+      })()
     JS
     assert_equal "Hello World", result.value
   end
 
-  def test_fetch_response_has_headers_object
+  def test_fetch_response_headers
     mock = MockHTTPSandbox.new
     mock.queue_response(
       status: 200,
@@ -467,8 +517,10 @@ class FetchPolyfillTest < Minitest::Test
     sandbox = mock.create_sandbox
 
     result = sandbox.eval(<<~JS)
-      var response = fetch('https://api.example.com/data');
-      response.headers.get('content-type')
+      (async () => {
+        var response = await fetch('https://api.example.com/data');
+        return response.headers.get('content-type');
+      })()
     JS
     assert_equal "application/json", result.value
   end
@@ -478,12 +530,14 @@ class FetchPolyfillTest < Minitest::Test
     sandbox = mock.create_sandbox
 
     result = sandbox.eval(<<~JS)
-      var request = new Request('https://api.example.com/users', {
-        method: 'POST',
-        body: '{"name":"John"}'
-      });
-      var response = fetch(request);
-      response.status
+      (async () => {
+        var request = new Request('https://api.example.com/users', {
+          method: 'POST',
+          body: '{"name":"John"}'
+        });
+        var response = await fetch(request);
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
@@ -498,18 +552,89 @@ class FetchPolyfillTest < Minitest::Test
     sandbox = mock.create_sandbox
 
     result = sandbox.eval(<<~JS)
-      var headers = new Headers();
-      headers.set('Content-Type', 'application/json');
-      headers.set('Authorization', 'Bearer token123');
-      var response = fetch('https://api.example.com/data', {
-        method: 'GET',
-        headers: headers
-      });
-      response.status
+      (async () => {
+        var headers = new Headers();
+        headers.set('Content-Type', 'application/json');
+        headers.set('Authorization', 'Bearer token123');
+        var response = await fetch('https://api.example.com/data', {
+          method: 'GET',
+          headers: headers
+        });
+        return response.status;
+      })()
     JS
 
     assert_equal 200, result.value
-    # Note: headers are passed through to the mock
+  end
+
+  def test_fetch_error_handling_with_catch
+    mock = MockHTTPSandbox.new
+    sandbox = mock.create_sandbox
+
+    # Test that fetch errors can be caught
+    result = sandbox.eval(<<~JS)
+      fetch()
+        .then(() => 'should not reach')
+        .catch(error => error.message)
+    JS
+    assert_match(/requires at least 1 argument/i, result.value)
+  end
+
+  def test_fetch_status_properties
+    mock = MockHTTPSandbox.new
+    mock.queue_response(status: 404, statusText: "Not Found", body: "", headers: {})
+    sandbox = mock.create_sandbox
+
+    result = sandbox.eval(<<~JS)
+      (async () => {
+        var response = await fetch('https://api.example.com/missing');
+        return JSON.stringify({
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok
+        });
+      })()
+    JS
+    data = JSON.parse(result.value)
+    assert_equal 404, data["status"]
+    assert_equal "Not Found", data["statusText"]
+    assert_equal false, data["ok"]
+  end
+
+  # ============================================================================
+  # Promise Tests
+  # ============================================================================
+
+  def test_promise_resolve
+    result = @sandbox.eval("Promise.resolve(42)")
+    assert_equal 42, result.value
+  end
+
+  def test_promise_chain
+    result = @sandbox.eval(<<~JS)
+      Promise.resolve(1)
+        .then(x => x + 1)
+        .then(x => x * 2)
+    JS
+    assert_equal 4, result.value
+  end
+
+  def test_async_await
+    result = @sandbox.eval(<<~JS)
+      (async () => {
+        const a = await Promise.resolve(10);
+        const b = await Promise.resolve(20);
+        return a + b;
+      })()
+    JS
+    assert_equal 30, result.value
+  end
+
+  def test_promise_reject_is_caught
+    error = assert_raises(QuickJS::JavascriptError) do
+      @sandbox.eval("Promise.reject(new Error('test error'))")
+    end
+    assert_match(/test error/i, error.message)
   end
 end
 

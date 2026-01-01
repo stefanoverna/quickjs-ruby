@@ -118,40 +118,45 @@ module QuickJS
 
           text() {
             if (this._bodyUsed) {
-              throw new TypeError('Body has already been consumed');
+              return Promise.reject(new TypeError('Body has already been consumed'));
             }
             this._bodyUsed = true;
-            return this._body;
+            return Promise.resolve(this._body);
           }
 
           json() {
             if (this._bodyUsed) {
-              throw new TypeError('Body has already been consumed');
+              return Promise.reject(new TypeError('Body has already been consumed'));
             }
             this._bodyUsed = true;
-            return JSON.parse(this._body);
+            try {
+              return Promise.resolve(JSON.parse(this._body));
+            } catch (e) {
+              return Promise.reject(e);
+            }
           }
 
           arrayBuffer() {
             if (this._bodyUsed) {
-              throw new TypeError('Body has already been consumed');
+              return Promise.reject(new TypeError('Body has already been consumed'));
             }
             this._bodyUsed = true;
             // Simple implementation - convert string to array of char codes
-            var buf = new ArrayBuffer(this._body.length);
+            var body = this._body;
+            var buf = new ArrayBuffer(body.length);
             var view = new Uint8Array(buf);
-            for (var i = 0; i < this._body.length; i++) {
-              view[i] = this._body.charCodeAt(i) & 0xff;
+            for (var i = 0; i < body.length; i++) {
+              view[i] = body.charCodeAt(i) & 0xff;
             }
-            return buf;
+            return Promise.resolve(buf);
           }
 
           blob() {
-            throw new TypeError('Blob is not supported in this environment');
+            return Promise.reject(new TypeError('Blob is not supported in this environment'));
           }
 
           formData() {
-            throw new TypeError('FormData is not supported in this environment');
+            return Promise.reject(new TypeError('FormData is not supported in this environment'));
           }
 
           static error() {
@@ -258,11 +263,15 @@ module QuickJS
           }
 
           text() {
-            return this._body || '';
+            return Promise.resolve(this._body || '');
           }
 
           json() {
-            return JSON.parse(this._body || 'null');
+            try {
+              return Promise.resolve(JSON.parse(this._body || 'null'));
+            } catch (e) {
+              return Promise.reject(e);
+            }
           }
         };
       })();
@@ -278,66 +287,75 @@ module QuickJS
           return;
         }
 
-        // Wrap native fetch to return proper Response objects
+        // Wrap native fetch to return a Promise with proper Response objects
         globalThis.fetch = function fetch(input, init) {
-          // Validate input - must be provided
-          if (input === undefined) {
-            throw new TypeError('fetch() requires at least 1 argument (url)');
-          }
+          return new Promise(function(resolve, reject) {
+            // Validate input - must be provided
+            if (input === undefined) {
+              reject(new TypeError('fetch() requires at least 1 argument (url)'));
+              return;
+            }
 
-          var url, options = {};
+            try {
+              var url, options = {};
 
-          // Handle Request object as input
-          if (input instanceof Request) {
-            url = input.url;
-            options.method = input.method;
-            if (input._body) {
-              options.body = input._body;
-            }
-            // Copy headers from Request
-            var headerObj = {};
-            input.headers.forEach(function(value, name) {
-              headerObj[name] = value;
-            });
-            if (Object.keys(headerObj).length > 0) {
-              options.headers = headerObj;
-            }
-          } else {
-            url = String(input);
-          }
-
-          // Merge init options (overrides Request properties)
-          if (init) {
-            if (init.method !== undefined) {
-              options.method = init.method;
-            }
-            if (init.body !== undefined) {
-              options.body = init.body;
-            }
-            if (init.headers !== undefined) {
-              if (init.headers instanceof Headers) {
+              // Handle Request object as input
+              if (input instanceof Request) {
+                url = input.url;
+                options.method = input.method;
+                if (input._body) {
+                  options.body = input._body;
+                }
+                // Copy headers from Request
                 var headerObj = {};
-                init.headers.forEach(function(value, name) {
+                input.headers.forEach(function(value, name) {
                   headerObj[name] = value;
                 });
-                options.headers = headerObj;
+                if (Object.keys(headerObj).length > 0) {
+                  options.headers = headerObj;
+                }
               } else {
-                options.headers = init.headers;
+                url = String(input);
               }
+
+              // Merge init options (overrides Request properties)
+              if (init) {
+                if (init.method !== undefined) {
+                  options.method = init.method;
+                }
+                if (init.body !== undefined) {
+                  options.body = init.body;
+                }
+                if (init.headers !== undefined) {
+                  if (init.headers instanceof Headers) {
+                    var headerObj = {};
+                    init.headers.forEach(function(value, name) {
+                      headerObj[name] = value;
+                    });
+                    options.headers = headerObj;
+                  } else {
+                    options.headers = init.headers;
+                  }
+                }
+              }
+
+              // Call native fetch (synchronous, but wrapped in Promise)
+              var nativeResponse = nativeFetch(url, options);
+
+              // Convert native response to Response object
+              var responseHeaders = new Headers(nativeResponse.headers || {});
+
+              var response = new Response(nativeResponse.body, {
+                status: nativeResponse.status,
+                statusText: nativeResponse.statusText,
+                headers: responseHeaders,
+                url: url
+              });
+
+              resolve(response);
+            } catch (error) {
+              reject(error);
             }
-          }
-
-          // Call native fetch
-          var nativeResponse = nativeFetch(url, options);
-
-          // Convert native response to Response object
-          var responseHeaders = new Headers(nativeResponse.headers || {});
-
-          return new Response(nativeResponse.body, {
-            status: nativeResponse.status,
-            statusText: nativeResponse.statusText,
-            headers: responseHeaders,
-            url: url
           });
         };
       })();
