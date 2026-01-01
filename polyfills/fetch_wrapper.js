@@ -23,8 +23,8 @@
         if (input instanceof Request) {
           url = input.url;
           options.method = input.method;
-          if (input._body) {
-            options.body = input._body;
+          if (input._bodyText) {
+            options.body = input._bodyText;
           }
           // Copy headers from Request
           var headerObj = {};

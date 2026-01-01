@@ -1,66 +1,124 @@
+// Headers class based on JakeChampion/fetch polyfill
+// Adapted for QuickJS Ruby gem
+// Source: https://github.com/JakeChampion/fetch
+
 (function() {
   if (typeof Headers !== 'undefined') return;
 
-  globalThis.Headers = class Headers {
-    constructor(init) {
-      this._headers = {};
+  function normalizeName(name) {
+    if (typeof name !== 'string') {
+      name = String(name);
+    }
+    if (/[^a-z0-9\-#$%&'*+.^_`|~!]/i.test(name) || name === '') {
+      throw new TypeError('Invalid character in header field name: "' + name + '"');
+    }
+    return name.toLowerCase();
+  }
 
-      if (init) {
-        if (init instanceof Headers) {
-          init.forEach((value, name) => this.append(name, value));
-        } else if (Array.isArray(init)) {
-          init.forEach(([name, value]) => this.append(name, value));
-        } else if (typeof init === 'object') {
-          Object.entries(init).forEach(([name, value]) => this.append(name, value));
-        }
+  function normalizeValue(value) {
+    if (typeof value !== 'string') {
+      value = String(value);
+    }
+    return value;
+  }
+
+  function iteratorFor(items) {
+    const iterator = {
+      next: function() {
+        const value = items.shift();
+        return {done: value === undefined, value: value};
+      }
+    };
+    if (typeof Symbol !== 'undefined' && Symbol.iterator) {
+      iterator[Symbol.iterator] = function() {
+        return iterator;
+      };
+    }
+    return iterator;
+  }
+
+  globalThis.Headers = class Headers {
+    constructor(headers) {
+      this.map = {};
+
+      if (headers instanceof Headers) {
+        headers.forEach((value, name) => this.append(name, value));
+      } else if (Array.isArray(headers)) {
+        headers.forEach((header) => {
+          if (header.length != 2) {
+            throw new TypeError('Headers constructor: expected name/value pair to be length 2, found' + header.length);
+          }
+          this.append(header[0], header[1]);
+        });
+      } else if (headers) {
+        Object.getOwnPropertyNames(headers).forEach((name) => {
+          this.append(name, headers[name]);
+        });
       }
     }
 
     append(name, value) {
-      const key = name.toLowerCase();
-      if (this._headers[key]) {
-        this._headers[key] += ', ' + value;
-      } else {
-        this._headers[key] = String(value);
-      }
+      name = normalizeName(name);
+      value = normalizeValue(value);
+      const oldValue = this.map[name];
+      this.map[name] = oldValue ? oldValue + ', ' + value : value;
     }
 
     delete(name) {
-      delete this._headers[name.toLowerCase()];
+      delete this.map[normalizeName(name)];
     }
 
     get(name) {
-      return this._headers[name.toLowerCase()] || null;
+      name = normalizeName(name);
+      return this.has(name) ? this.map[name] : null;
     }
 
     has(name) {
-      return name.toLowerCase() in this._headers;
+      return this.map.hasOwnProperty(normalizeName(name));
     }
 
     set(name, value) {
-      this._headers[name.toLowerCase()] = String(value);
+      this.map[normalizeName(name)] = normalizeValue(value);
     }
 
     forEach(callback, thisArg) {
-      Object.entries(this._headers).forEach(([name, value]) => {
-        callback.call(thisArg, value, name, this);
-      });
+      for (const name in this.map) {
+        if (this.map.hasOwnProperty(name)) {
+          callback.call(thisArg, this.map[name], name, this);
+        }
+      }
     }
 
     keys() {
-      return Object.keys(this._headers)[Symbol.iterator]();
+      const items = [];
+      this.forEach((value, name) => {
+        items.push(name);
+      });
+      return iteratorFor(items);
     }
 
     values() {
-      return Object.values(this._headers)[Symbol.iterator]();
+      const items = [];
+      this.forEach((value) => {
+        items.push(value);
+      });
+      return iteratorFor(items);
     }
 
     entries() {
-      return Object.entries(this._headers)[Symbol.iterator]();
+      const items = [];
+      this.forEach((value, name) => {
+        items.push([name, value]);
+      });
+      return iteratorFor(items);
     }
 
-    [Symbol.iterator]() {
-      return this.entries();
+    *[Symbol.iterator]() {
+      for (const name in this.map) {
+        if (this.map.hasOwnProperty(name)) {
+          yield [name, this.map[name]];
+        }
+      }
     }
   };
 })();

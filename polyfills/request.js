@@ -1,95 +1,113 @@
+// Request class based on JakeChampion/fetch polyfill
+// Adapted for QuickJS Ruby gem
+// Source: https://github.com/JakeChampion/fetch
+
 (function() {
   if (typeof Request !== 'undefined') return;
 
-  var validMethods = ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT'];
+  const methods = ['CONNECT', 'DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT', 'TRACE'];
 
   function normalizeMethod(method) {
-    var upper = method.toUpperCase();
-    if (validMethods.indexOf(upper) !== -1) {
-      return upper;
-    }
-    return method;
+    const upcased = method.toUpperCase();
+    return methods.indexOf(upcased) > -1 ? upcased : method;
   }
 
-  globalThis.Request = class Request {
-    constructor(input, init = {}) {
-      if (input instanceof Request) {
-        this.url = input.url;
-        this.method = input.method;
-        this.headers = new Headers(input.headers);
-        this._body = input._body;
-        this.credentials = input.credentials;
-        this.mode = input.mode;
-        this.cache = input.cache;
-        this.redirect = input.redirect;
-        this.referrer = input.referrer;
-        this.integrity = input.integrity;
+  function consumed(body) {
+    if (body._noBody) return;
+    if (body.bodyUsed) {
+      return Promise.reject(new TypeError('Body has already been consumed'));
+    }
+    body.bodyUsed = true;
+  }
+
+  // Body mixin - shared between Request and Response
+  class BodyMixin {
+    constructor() {
+      this.bodyUsed = false;
+    }
+
+    _initBody(body) {
+      this.bodyUsed = this.bodyUsed;
+      this._bodyInit = body;
+
+      if (!body) {
+        this._noBody = true;
+        this._bodyText = '';
+      } else if (typeof body === 'string') {
+        this._bodyText = body;
+      } else if (body !== undefined && body !== null) {
+        this._bodyText = String(body);
       } else {
-        this.url = String(input);
-        this.method = 'GET';
-        this.headers = new Headers();
-        this._body = null;
-        this.credentials = 'same-origin';
-        this.mode = 'cors';
-        this.cache = 'default';
-        this.redirect = 'follow';
-        this.referrer = 'about:client';
-        this.integrity = '';
+        this._bodyText = '';
       }
 
-      // Apply init options
-      if (init.method !== undefined) {
-        this.method = normalizeMethod(init.method);
-      }
-      if (init.headers !== undefined) {
-        this.headers = init.headers instanceof Headers
-          ? init.headers
-          : new Headers(init.headers);
-      }
-      if (init.body !== undefined && init.body !== null) {
-        if (this.method === 'GET' || this.method === 'HEAD') {
-          throw new TypeError('Request with GET/HEAD method cannot have body');
+      if (!this.headers.get('content-type')) {
+        if (typeof body === 'string') {
+          this.headers.set('content-type', 'text/plain;charset=UTF-8');
         }
-        this._body = String(init.body);
       }
-      if (init.credentials !== undefined) {
-        this.credentials = init.credentials;
-      }
-      if (init.mode !== undefined) {
-        this.mode = init.mode;
-      }
-      if (init.cache !== undefined) {
-        this.cache = init.cache;
-      }
-      if (init.redirect !== undefined) {
-        this.redirect = init.redirect;
-      }
-      if (init.referrer !== undefined) {
-        this.referrer = init.referrer;
-      }
-      if (init.integrity !== undefined) {
-        this.integrity = init.integrity;
-      }
-    }
-
-    get body() {
-      return this._body;
-    }
-
-    clone() {
-      return new Request(this);
     }
 
     text() {
-      return Promise.resolve(this._body || '');
+      const rejected = consumed(this);
+      if (rejected) {
+        return rejected;
+      }
+      return Promise.resolve(this._bodyText);
     }
 
     json() {
-      try {
-        return Promise.resolve(JSON.parse(this._body || 'null'));
-      } catch (e) {
-        return Promise.reject(e);
+      return this.text().then(JSON.parse);
+    }
+  }
+
+  globalThis.Request = class Request extends BodyMixin {
+    constructor(input, options = {}) {
+      super();
+
+      if (!(this instanceof Request)) {
+        throw new TypeError('Please use the "new" operator, this DOM object constructor cannot be called as a function.');
       }
+
+      let body = options.body;
+
+      if (input instanceof Request) {
+        if (input.bodyUsed) {
+          throw new TypeError('Already read');
+        }
+        this.url = input.url;
+        this.credentials = input.credentials;
+        if (!options.headers) {
+          this.headers = new Headers(input.headers);
+        }
+        this.method = input.method;
+        if (!body && input._bodyInit != null) {
+          body = input._bodyInit;
+          input.bodyUsed = true;
+        }
+      } else {
+        this.url = String(input);
+      }
+
+      this.credentials = options.credentials || this.credentials || 'same-origin';
+      if (options.headers || !this.headers) {
+        this.headers = new Headers(options.headers);
+      }
+      this.method = normalizeMethod(options.method || this.method || 'GET');
+
+      if ((this.method === 'GET' || this.method === 'HEAD') && body) {
+        throw new TypeError('Request with GET or HEAD method cannot have body');
+      }
+
+      this._initBody(body);
+    }
+
+    get body() {
+      return this._bodyText;
+    }
+
+    clone() {
+      return new Request(this, {body: this._bodyInit});
     }
   };
 })();

@@ -4,7 +4,7 @@ module QuickJS
   # JavaScript polyfills for the Fetch API
   # These provide standard Headers, Request, and Response classes
   module FetchPolyfill
-    POLYFILLS_DIR = File.expand_path("../../../polyfills", __dir__)
+    POLYFILLS_DIR = File.expand_path("../../polyfills", __dir__)
 
     HEADERS_CLASS = File.read(File.join(POLYFILLS_DIR, "headers.js"))
 
