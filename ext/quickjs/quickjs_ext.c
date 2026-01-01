@@ -188,6 +188,34 @@ static JSValue js_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValue
             body_str = JS_ToCString(ctx, body_val);
         }
         JS_FreeValue(ctx, body_val);
+
+        // Get headers
+        JSValue headers_val = JS_GetPropertyStr(ctx, argv[1], "headers");
+        if (!JS_IsUndefined(headers_val) && !JS_IsNull(headers_val) && JS_IsObject(headers_val)) {
+            // Iterate over header properties
+            JSPropertyEnum *props;
+            uint32_t prop_count;
+            if (JS_GetOwnPropertyNames(ctx, &props, &prop_count, headers_val, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) == 0) {
+                for (uint32_t i = 0; i < prop_count; i++) {
+                    const char *key = JS_AtomToCString(ctx, props[i].atom);
+                    if (key) {
+                        JSValue val = JS_GetProperty(ctx, headers_val, props[i].atom);
+                        if (!JS_IsUndefined(val) && !JS_IsNull(val)) {
+                            const char *value = JS_ToCString(ctx, val);
+                            if (value) {
+                                rb_hash_aset(rb_headers, rb_str_new2(key), rb_str_new2(value));
+                                JS_FreeCString(ctx, value);
+                            }
+                        }
+                        JS_FreeValue(ctx, val);
+                        JS_FreeCString(ctx, key);
+                    }
+                    JS_FreeAtom(ctx, props[i].atom);
+                }
+                js_free(ctx, props);
+            }
+        }
+        JS_FreeValue(ctx, headers_val);
     }
 
     // Call Ruby HTTP executor with exception protection
@@ -613,7 +641,7 @@ static VALUE sandbox_eval(VALUE self, VALUE code) {
     // Evaluate code
     const char *code_str = StringValueCStr(code);
     JSValue result = JS_Eval(wrapper->ctx, code_str, strlen(code_str), "<eval>",
-                            JS_EVAL_TYPE_GLOBAL);
+                            JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_ASYNC);
 
     // Execute pending jobs (Promise callbacks, etc.)
     // This is required for async/await and Promise-based code to work
@@ -632,21 +660,37 @@ static VALUE sandbox_eval(VALUE self, VALUE code) {
     }
 
     // If result is a Promise, unwrap the resolved/rejected value
-    if (!JS_IsException(result) && JS_IsObject(result)) {
+    // Loop to handle nested Promises (e.g., from async IIFE wrapped by async eval)
+    while (!JS_IsException(result) && JS_IsObject(result)) {
         JSPromiseStateEnum state = JS_PromiseState(wrapper->ctx, result);
         if (state == JS_PROMISE_FULFILLED) {
             // Get the resolved value
             JSValue resolved = JS_PromiseResult(wrapper->ctx, result);
             JS_FreeValue(wrapper->ctx, result);
             result = resolved;
+
+            // JS_EVAL_FLAG_ASYNC wraps the result in {value: ...}, unwrap it
+            if (JS_IsObject(result)) {
+                JSAtom value_atom = JS_NewAtom(wrapper->ctx, "value");
+                if (JS_HasProperty(wrapper->ctx, result, value_atom)) {
+                    JSValue unwrapped = JS_GetProperty(wrapper->ctx, result, value_atom);
+                    JS_FreeValue(wrapper->ctx, result);
+                    result = unwrapped;
+                }
+                JS_FreeAtom(wrapper->ctx, value_atom);
+            }
+            // Continue loop to check if unwrapped value is also a Promise
         } else if (state == JS_PROMISE_REJECTED) {
             // Get the rejection reason and convert to exception
             JSValue reason = JS_PromiseResult(wrapper->ctx, result);
             JS_FreeValue(wrapper->ctx, result);
             JS_Throw(wrapper->ctx, reason);
             result = JS_EXCEPTION;
+            break;
+        } else {
+            // Still pending, break out
+            break;
         }
-        // If still pending, return the Promise object as-is
     }
 
     // Clear current wrapper
