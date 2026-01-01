@@ -229,6 +229,7 @@ static JSValue js_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     VALUE rb_status = rb_hash_aref(rb_response, ID2SYM(rb_intern("status")));
     VALUE rb_status_text = rb_hash_aref(rb_response, ID2SYM(rb_intern("statusText")));
     VALUE rb_response_body = rb_hash_aref(rb_response, ID2SYM(rb_intern("body")));
+    VALUE rb_response_headers = rb_hash_aref(rb_response, ID2SYM(rb_intern("headers")));
 
     int status = NIL_P(rb_status) ? 200 : NUM2INT(rb_status);
     const char *status_text = NIL_P(rb_status_text) ? "OK" : StringValueCStr(rb_status_text);
@@ -243,8 +244,19 @@ static JSValue js_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     JS_SetPropertyStr(ctx, response_obj, "ok", JS_NewBool(ctx, status >= 200 && status < 300));
     JS_SetPropertyStr(ctx, response_obj, "body", JS_NewString(ctx, response_body));
 
-    // Add headers object
+    // Add headers object - convert Ruby hash to JS object
     JSValue headers_obj = JS_NewObject(ctx);
+    if (!NIL_P(rb_response_headers) && TYPE(rb_response_headers) == T_HASH) {
+        VALUE rb_keys = rb_funcall(rb_response_headers, rb_intern("keys"), 0);
+        long keys_len = RARRAY_LEN(rb_keys);
+        for (long i = 0; i < keys_len; i++) {
+            VALUE rb_key = rb_ary_entry(rb_keys, i);
+            VALUE rb_val = rb_hash_aref(rb_response_headers, rb_key);
+            const char *key_str = StringValueCStr(rb_key);
+            const char *val_str = StringValueCStr(rb_val);
+            JS_SetPropertyStr(ctx, headers_obj, key_str, JS_NewString(ctx, val_str));
+        }
+    }
     JS_SetPropertyStr(ctx, response_obj, "headers", headers_obj);
 
     return response_obj;
@@ -602,6 +614,40 @@ static VALUE sandbox_eval(VALUE self, VALUE code) {
     const char *code_str = StringValueCStr(code);
     JSValue result = JS_Eval(wrapper->ctx, code_str, strlen(code_str), "<eval>",
                             JS_EVAL_TYPE_GLOBAL);
+
+    // Execute pending jobs (Promise callbacks, etc.)
+    // This is required for async/await and Promise-based code to work
+    JSContext *ctx1;
+    int job_count = 0;
+    while (JS_ExecutePendingJob(wrapper->rt, &ctx1) > 0) {
+        job_count++;
+        // Check for timeout during job execution
+        if (wrapper->timeout_ms > 0) {
+            int64_t elapsed = get_time_ms() - wrapper->start_time_ms;
+            if (elapsed > wrapper->timeout_ms) {
+                wrapper->timed_out = 1;
+                break;
+            }
+        }
+    }
+
+    // If result is a Promise, unwrap the resolved/rejected value
+    if (!JS_IsException(result) && JS_IsObject(result)) {
+        JSPromiseStateEnum state = JS_PromiseState(wrapper->ctx, result);
+        if (state == JS_PROMISE_FULFILLED) {
+            // Get the resolved value
+            JSValue resolved = JS_PromiseResult(wrapper->ctx, result);
+            JS_FreeValue(wrapper->ctx, result);
+            result = resolved;
+        } else if (state == JS_PROMISE_REJECTED) {
+            // Get the rejection reason and convert to exception
+            JSValue reason = JS_PromiseResult(wrapper->ctx, result);
+            JS_FreeValue(wrapper->ctx, result);
+            JS_Throw(wrapper->ctx, reason);
+            result = JS_EXCEPTION;
+        }
+        // If still pending, return the Promise object as-is
+    }
 
     // Clear current wrapper
     current_wrapper = NULL;

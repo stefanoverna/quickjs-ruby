@@ -62,6 +62,10 @@ module QuickJS
       @http_config = nil
       @http_executor = nil
 
+      # Always inject fetch polyfills (Headers, Request, Response classes)
+      # These are useful even without HTTP enabled for code compatibility
+      inject_fetch_polyfills
+
       setup_http(http) if http
     end
 
@@ -105,6 +109,19 @@ module QuickJS
       @native_sandbox.http_callback = lambda do |method, url, body, headers|
         @http_executor.execute(method, url, body: body, headers: headers)
       end
+    end
+
+    def inject_fetch_polyfills
+      # Inject the Fetch API polyfills (Headers, Request, Response classes)
+      # This wraps the native fetch() to return proper Response objects
+      #
+      # Note: This may fail with very low memory limits (< ~150KB).
+      # In that case, the basic fetch() still works but returns plain objects
+      # instead of proper Response/Headers/Request instances.
+      @native_sandbox.eval(FetchPolyfill::FULL_POLYFILL)
+    rescue JavascriptError, MemoryLimitError
+      # Silently continue without polyfills for low-memory sandboxes
+      nil
     end
   end
 end

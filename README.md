@@ -35,6 +35,7 @@ This gem uses the **full QuickJS engine**, not MicroQuickJS. Here are the key di
 | **Destructuring** | ❌ No | ✅ Yes |
 | **Spread Operator** | ❌ No | ✅ Yes |
 | **BigInt/BigFloat** | ❌ No | ✅ Yes |
+| **Promises/async-await** | ❌ No | ✅ Yes |
 | **Binary Size** | Smaller (~500KB) | Larger (~1.5MB) |
 | **Memory Footprint** | Minimal | Moderate |
 | **Use Case** | Extreme resource constraints | Modern JS features needed |
@@ -89,6 +90,7 @@ This gem uses the **full QuickJS engine**, not MicroQuickJS. Here are the key di
 - **HTTP Security Controls** - Allowlist/denylist, rate limiting, IP blocking
 - **No Dangerous APIs** - No arbitrary file I/O or process access
 - **Full ES2020+ Support** - Modern JavaScript features including BigInt, const/let, arrow functions
+- **Async/Await & Promises** - Full Promise support with automatic resolution
 
 ### Production-Ready
 
@@ -226,6 +228,23 @@ JS
 
 # BigInt (for large numbers)
 QuickJS.eval("const big = 9007199254740991n; big + 1n").value  # => "9007199254740992"
+
+# Promises and async/await
+QuickJS.eval(<<~JS).value
+  (async () => {
+    const result = await Promise.resolve(42);
+    return result * 2;
+  })()
+JS
+# => 84
+
+# Promise chains
+QuickJS.eval(<<~JS).value
+  Promise.resolve(10)
+    .then(x => x + 5)
+    .then(x => x * 2)
+JS
+# => 30
 ```
 
 ### Passing Data to Scripts
@@ -289,7 +308,7 @@ puts result.console_output  # => "Debug: 42\nUser: [object Object]"
 
 ### HTTP Requests
 
-Enable HTTP with security controls:
+Enable HTTP with security controls. The `fetch()` API is **fully async** and supports `await`, `.then()`, and `.catch()`:
 
 ```ruby
 sandbox = QuickJS::Sandbox.new(
@@ -315,14 +334,32 @@ sandbox = QuickJS::Sandbox.new(
   }
 )
 
+# Using async/await (recommended)
 result = sandbox.eval(<<~JS)
-  const response = fetch('https://api.github.com/users/octocat');
-  const data = JSON.parse(response.body);
-  data.login
+  (async () => {
+    const response = await fetch('https://api.github.com/users/octocat');
+    const data = await response.json();
+    return data.login;
+  })()
+JS
+
+puts result.value  # => "octocat"
+
+# Using Promise chains
+result = sandbox.eval(<<~JS)
+  fetch('https://api.github.com/users/octocat')
+    .then(response => response.json())
+    .then(data => data.login)
 JS
 
 puts result.value  # => "octocat"
 ```
+
+The fetch implementation includes standard Web API classes:
+- `fetch()` - Returns a `Promise<Response>`
+- `Response` - With `json()`, `text()`, `arrayBuffer()` methods (all return Promises)
+- `Request` - For building HTTP requests
+- `Headers` - For header manipulation
 
 ## Security Guardrails
 
@@ -388,7 +425,12 @@ sandbox = QuickJS::Sandbox.new(
 )
 
 # ✅ Allowed
-sandbox.eval("fetch('https://api.trusted.com/users')")
+sandbox.eval(<<~JS)
+  (async () => {
+    const response = await fetch('https://api.trusted.com/users');
+    return await response.json();
+  })()
+JS
 
 # ❌ Blocked (denylist)
 begin
