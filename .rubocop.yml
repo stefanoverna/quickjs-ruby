@@ -11,7 +11,6 @@ AllCops:
     - 'ext/**/*'
     - 'tmp/**/*'
     - 'benchmark/**/*'
-    - 'explorer.rb'
 
 # Style preferences
 Style/StringLiterals:
@@ -31,16 +30,16 @@ Minitest/MultipleAssertions:
 # Naming
 Naming/VariableNumber:
   Exclude:
-    - "test/**/*"
+    - 'test/**/*'
 
 # Layout preferences
 Layout/LineLength:
   Max: 120
   Exclude:
-    - "quickjs.gemspec"
+    - 'quickjs.gemspec'
 
 # Exception classes use positional arguments because the C extension
 # calls rb_class_new_instance with positional arguments
 Style/OptionalBooleanParameter:
   Exclude:
-    - "lib/quickjs/errors.rb"
+    - 'lib/quickjs/errors.rb'
