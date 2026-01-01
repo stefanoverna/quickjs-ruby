@@ -1,13 +1,12 @@
 # Differences Between quickjs-ruby and mquickjs-ruby
 
-This document lists all differences between this repository (quickjs-ruby) and [mquickjs-ruby](https://github.com/stefanoverna/mquickjs-ruby). The goal is to keep the two repositories as similar as possible, with only intentional differences due to the underlying JavaScript engines.
+This document lists all differences between this repository (quickjs-ruby) and [mquickjs-ruby](https://github.com/stefanoverna/mquickjs-ruby). The goal is to keep the two repositories as similar as possible.
 
 ## Summary
 
 | Category | Status |
 |----------|--------|
 | Ruby API files | Module names differ (expected) |
-| Memory defaults | Intentionally different |
 | README | quickjs-ruby is missing significant content |
 | test/README.md | Missing in quickjs-ruby |
 | LICENSE | Different format/credits |
@@ -15,33 +14,6 @@ This document lists all differences between this repository (quickjs-ruby) and [
 | .rubocop.yml | Minor differences (path names) |
 | Gemfile | Identical structure |
 | Rakefile | Identical structure (different paths) |
-
----
-
-## Intentional Differences (Should NOT Be Changed)
-
-These differences exist because of the different JavaScript engines:
-
-### 1. Default Memory Limits
-
-| Setting | quickjs-ruby | mquickjs-ruby | Reason |
-|---------|-------------|---------------|--------|
-| Default `memory_limit` | 1,000,000 (1MB) | 50,000 (50KB) | QuickJS requires more memory for ES2020+ features |
-| Minimum `memory_limit` | 100,000 (100KB) | 10,000 (10KB) | QuickJS stdlib needs ~100KB to initialize |
-
-**Files affected:**
-- `lib/quickjs.rb:19` - default memory_limit
-- `lib/quickjs/sandbox.rb:11,48,51-54` - default and minimum validation
-
-### 2. Test Memory Values
-
-Tests use different memory values appropriate for each engine:
-
-| Test Case | quickjs-ruby | mquickjs-ruby |
-|-----------|-------------|---------------|
-| Invalid memory limit | 50,000 | 5,000 |
-| Valid minimum | 100,000 | 10,000 |
-| Memory for allocation test | 150,000 | 15,000 |
 
 ---
 
@@ -123,28 +95,28 @@ All these files differ only in:
 - Module name: `QuickJS` vs `MQuickJS`
 - Path references: `quickjs` vs `mquickjs`
 
-| quickjs-ruby | mquickjs-ruby | Extra Differences |
-|--------------|---------------|-------------------|
-| `lib/quickjs.rb` | `lib/mquickjs.rb` | memory_limit default |
-| `lib/quickjs/version.rb` | `lib/mquickjs/version.rb` | None |
-| `lib/quickjs/errors.rb` | `lib/mquickjs/errors.rb` | None |
-| `lib/quickjs/result.rb` | `lib/mquickjs/result.rb` | None |
-| `lib/quickjs/sandbox.rb` | `lib/mquickjs/sandbox.rb` | memory defaults/limits |
-| `lib/quickjs/http_config.rb` | `lib/mquickjs/http_config.rb` | None |
-| `lib/quickjs/http_executor.rb` | `lib/mquickjs/http_executor.rb` | None |
+| quickjs-ruby | mquickjs-ruby |
+|--------------|---------------|
+| `lib/quickjs.rb` | `lib/mquickjs.rb` |
+| `lib/quickjs/version.rb` | `lib/mquickjs/version.rb` |
+| `lib/quickjs/errors.rb` | `lib/mquickjs/errors.rb` |
+| `lib/quickjs/result.rb` | `lib/mquickjs/result.rb` |
+| `lib/quickjs/sandbox.rb` | `lib/mquickjs/sandbox.rb` |
+| `lib/quickjs/http_config.rb` | `lib/mquickjs/http_config.rb` |
+| `lib/quickjs/http_executor.rb` | `lib/mquickjs/http_executor.rb` |
 
 ### Test Files (test/)
 
-| quickjs-ruby | mquickjs-ruby | Extra Differences |
-|--------------|---------------|-------------------|
-| `test/mquickjs_test.rb` | `test/mquickjs_test.rb` | memory values |
-| `test/set_variable_test.rb` | `test/set_variable_test.rb` | None |
-| `test/fetch_test.rb` | `test/fetch_test.rb` | None |
-| `test/http_config_test.rb` | `test/http_config_test.rb` | None |
-| `test/http_executor_test.rb` | `test/http_executor_test.rb` | None |
-| `test/error_documentation_test.rb` | `test/error_documentation_test.rb` | None |
-| `test/run_all_tests.rb` | `test/run_all_tests.rb` | None |
-| N/A | `test/README.md` | **Missing in quickjs-ruby** |
+| quickjs-ruby | mquickjs-ruby |
+|--------------|---------------|
+| `test/mquickjs_test.rb` | `test/mquickjs_test.rb` |
+| `test/set_variable_test.rb` | `test/set_variable_test.rb` |
+| `test/fetch_test.rb` | `test/fetch_test.rb` |
+| `test/http_config_test.rb` | `test/http_config_test.rb` |
+| `test/http_executor_test.rb` | `test/http_executor_test.rb` |
+| `test/error_documentation_test.rb` | `test/error_documentation_test.rb` |
+| `test/run_all_tests.rb` | `test/run_all_tests.rb` |
+| N/A | `test/README.md` (**Missing**) |
 
 ### Benchmark Files (benchmark/)
 
@@ -206,6 +178,5 @@ When making changes, verify:
 - [ ] Both repos pass all tests (`rake test`)
 - [ ] Both repos pass lint (`rake rubocop`)
 - [ ] README reflects the correct engine (QuickJS vs MicroQuickJS)
-- [ ] Memory defaults are appropriate for each engine
 - [ ] API documentation matches implementation
 - [ ] All structural changes are mirrored in both repos
