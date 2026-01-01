@@ -229,6 +229,7 @@ static JSValue js_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     VALUE rb_status = rb_hash_aref(rb_response, ID2SYM(rb_intern("status")));
     VALUE rb_status_text = rb_hash_aref(rb_response, ID2SYM(rb_intern("statusText")));
     VALUE rb_response_body = rb_hash_aref(rb_response, ID2SYM(rb_intern("body")));
+    VALUE rb_response_headers = rb_hash_aref(rb_response, ID2SYM(rb_intern("headers")));
 
     int status = NIL_P(rb_status) ? 200 : NUM2INT(rb_status);
     const char *status_text = NIL_P(rb_status_text) ? "OK" : StringValueCStr(rb_status_text);
@@ -243,8 +244,19 @@ static JSValue js_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     JS_SetPropertyStr(ctx, response_obj, "ok", JS_NewBool(ctx, status >= 200 && status < 300));
     JS_SetPropertyStr(ctx, response_obj, "body", JS_NewString(ctx, response_body));
 
-    // Add headers object
+    // Add headers object - convert Ruby hash to JS object
     JSValue headers_obj = JS_NewObject(ctx);
+    if (!NIL_P(rb_response_headers) && TYPE(rb_response_headers) == T_HASH) {
+        VALUE rb_keys = rb_funcall(rb_response_headers, rb_intern("keys"), 0);
+        long keys_len = RARRAY_LEN(rb_keys);
+        for (long i = 0; i < keys_len; i++) {
+            VALUE rb_key = rb_ary_entry(rb_keys, i);
+            VALUE rb_val = rb_hash_aref(rb_response_headers, rb_key);
+            const char *key_str = StringValueCStr(rb_key);
+            const char *val_str = StringValueCStr(rb_val);
+            JS_SetPropertyStr(ctx, headers_obj, key_str, JS_NewString(ctx, val_str));
+        }
+    }
     JS_SetPropertyStr(ctx, response_obj, "headers", headers_obj);
 
     return response_obj;

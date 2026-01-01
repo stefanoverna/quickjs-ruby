@@ -5,6 +5,7 @@ require_relative "quickjs/errors"
 require_relative "quickjs/result"
 require_relative "quickjs/http_config"
 require_relative "quickjs/http_executor"
+require_relative "quickjs/fetch_polyfill"
 require_relative "quickjs/quickjs_native"
 require_relative "quickjs/sandbox"
 
