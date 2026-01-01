@@ -69,11 +69,14 @@ This gem uses the **full QuickJS engine**, not MicroQuickJS. Key differences:
   - [Memory \& CPU Limits](#memory--cpu-limits)
   - [Console Output](#console-output)
   - [HTTP Requests](#http-requests)
-    - [HTTP Configuration Options](#http-configuration-options)
-    - [Response Properties](#response-properties)
 - [JavaScript Support](#javascript-support)
   - [Supported Features (ES2020+)](#supported-features-es2020)
   - [Available Standard Library](#available-standard-library)
+  - [Polyfilled Web APIs](#polyfilled-web-apis)
+    - [Fetch API](#fetch-api)
+    - [URL API](#url-api)
+    - [URLSearchParams API](#urlsearchparams-api)
+    - [Headers API](#headers-api)
   - [Limitations](#limitations)
 - [Security Guardrails](#security-guardrails)
   - [Memory Safety](#memory-safety)
@@ -349,39 +352,40 @@ puts result.console_output  # => "Debug: 42\nUser: [object Object]"
 
 ### HTTP Requests
 
-Enable HTTP with security controls. The `fetch()` API is **fully async** and supports `await`, `.then()`, and `.catch()`:
+Enable HTTP with security controls. The `fetch()` API is **fully async** and supports `await`, `.then()`, and `.catch()`. For complete Fetch API documentation including `Request`, `Response`, and `Headers`, see [Polyfilled Web APIs](#polyfilled-web-apis).
 
 ```ruby
 sandbox = QuickJS::Sandbox.new(
   http: {
-    # Allowlist specific URLs
-    allowlist: [
-      'https://api.github.com/**',
-      'https://jsonplaceholder.typicode.com/**'
-    ],
+    # URL allowlist (only these patterns allowed)
+    allowlist: ['https://api.github.com/**', 'https://api.stripe.com/v1/**'],
 
-    # Or denylist URLs
-    denylist: ['https://evil.com/**'],
+    # Or denylist (block these patterns, allow everything else)
+    # denylist: ['https://evil.com/**'],
 
-    # Block private IPs (prevent SSRF)
-    block_private_ips: true,
+    # Security options
+    block_private_ips: true,                    # Block private/local IPs (default: true)
+    allowed_ports: [80, 443],                   # Allowed ports (default: [80, 443])
+    allowed_methods: ['GET', 'POST'],           # HTTP methods (default: GET, POST, PUT, DELETE, PATCH, HEAD)
 
     # Rate limiting
-    max_requests: 10,
+    max_requests: 10,                           # Max requests per eval (default: 10)
 
-    # Timeouts and size limits
-    timeout_ms: 5000,
-    max_response_size: 1_000_000  # 1MB
+    # Size limits
+    max_request_size: 1_048_576,                # Max request body (default: 1MB)
+    max_response_size: 1_048_576,               # Max response size (default: 1MB)
+
+    # Timeout
+    timeout_ms: 5000                            # Request timeout in ms (default: 5000)
   }
 )
 
-# Using async/await (recommended)
+# Using async/await
 result = sandbox.eval(<<~JS)
   const response = await fetch('https://api.github.com/users/octocat');
   const data = await response.json();
   data.login
 JS
-
 puts result.value  # => "octocat"
 
 # Using Promise chains
@@ -390,97 +394,7 @@ result = sandbox.eval(<<~JS)
     .then(response => response.json())
     .then(data => data.login)
 JS
-
 puts result.value  # => "octocat"
-```
-
-The fetch implementation includes standard Web API classes:
-- `fetch()` - Returns a `Promise<Response>`
-- `Response` - With `json()`, `text()`, `arrayBuffer()` methods (all return Promises)
-- `Request` - For building HTTP requests
-- `Headers` - For header manipulation
-
-#### HTTP Configuration Options
-
-```ruby
-sandbox = QuickJS::Sandbox.new(
-  http: {
-    # URL allowlist (only these patterns allowed) - use ONE of allowlist or denylist
-    allowlist: ['https://api.github.com/**', 'https://api.stripe.com/v1/**'],
-
-    # OR URL denylist (block these patterns, allow everything else)
-    # denylist: ['https://evil.com/**', 'https://*.malware.net/**'],
-
-    # Security options
-    block_private_ips: true,                    # Block private/local IPs (default: true)
-    allowed_ports: [80, 443],                   # Allowed ports (default: [80, 443])
-    allowed_methods: ['GET', 'POST'],           # HTTP methods allowed (default: GET, POST, PUT, DELETE, PATCH, HEAD)
-
-    # Rate limiting
-    max_requests: 10,                           # Max requests per eval (default: 10)
-
-    # Size limits
-    max_request_size: 1_048_576,                # Max request body size (default: 1MB)
-    max_response_size: 1_048_576,               # Max response size (default: 1MB)
-
-    # Timeout
-    timeout_ms: 5000                            # Request timeout in ms (default: 5000)
-  }
-)
-```
-
-#### Response Properties
-
-The `fetch()` function returns a Promise that resolves to a Response object following the standard [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Response), with full async/await support for modern JavaScript patterns.
-
-**Available properties:**
-
-| Property     | Type    | Description                                    |
-| ------------ | ------- | ---------------------------------------------- |
-| `status`     | Integer | HTTP status code (e.g., 200, 404, 500)         |
-| `statusText` | String  | HTTP status message (e.g., "OK", "Not Found")  |
-| `ok`         | Boolean | `true` if status is 200-299, `false` otherwise |
-| `headers`    | Headers | Response headers object                        |
-
-**Available methods (all return Promises):**
-
-| Method          | Returns           | Description                  |
-| --------------- | ----------------- | ---------------------------- |
-| `text()`        | Promise\<String\> | Response body as text        |
-| `json()`        | Promise\<Object\> | Response body parsed as JSON |
-| `arrayBuffer()` | Promise\<Buffer\> | Response body as binary data |
-
-**Example usage:**
-
-```javascript
-// Using async/await (recommended)
-const response = await fetch('https://api.example.com/users');
-console.log(response.status);      // 200
-console.log(response.statusText);  // "OK"
-console.log(response.ok);          // true
-
-const data = await response.json();
-console.log(data.users);
-
-// Using Promise chains
-fetch('https://api.example.com/users')
-  .then(response => {
-    console.log('Status:', response.status);
-    return response.json();
-  })
-  .then(data => {
-    console.log('Users:', data.users);
-    return data;
-  });
-
-// Checking response before parsing
-const response = await fetch('https://api.example.com/data');
-if (response.ok) {
-  const text = await response.text();
-  console.log(text);
-} else {
-  console.error('Request failed:', response.statusText);
-}
 ```
 
 ## JavaScript Support
@@ -607,6 +521,185 @@ const set = new Set([1, 2, 3])
 // BigInt
 const big = 9007199254740991n
 big + 1n
+```
+
+### Polyfilled Web APIs
+
+This gem includes polyfills for modern Web APIs that are not natively available in QuickJS, enabling you to use familiar browser APIs for HTTP requests and URL manipulation.
+
+#### Fetch API
+
+The `fetch()` API provides a modern interface for making HTTP requests. It returns a Promise that resolves to the Response to that request.
+
+```javascript
+// Basic GET request
+const response = await fetch('https://api.example.com/users');
+const data = await response.json();
+console.log(data.users);
+
+// POST request with JSON body
+const response = await fetch('https://api.example.com/posts', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ title: 'Hello', body: 'World' })
+});
+const post = await response.json();
+
+// Using Request object
+const request = new Request('https://api.example.com/data', {
+  method: 'GET',
+  headers: { 'Accept': 'application/json' }
+});
+const response = await fetch(request);
+```
+
+**Response Properties:**
+- `status` - HTTP status code (e.g., 200, 404)
+- `statusText` - HTTP status message (e.g., "OK", "Not Found")
+- `ok` - `true` if status is 200-299
+- `headers` - Headers object
+- `url` - Response URL
+
+**Response Methods (all return Promises):**
+- `text()` - Response body as text
+- `json()` - Response body parsed as JSON
+- `arrayBuffer()` - Response body as binary data
+
+**Request Properties:**
+- `url` - Request URL
+- `method` - HTTP method (GET, POST, etc.)
+- `headers` - Headers object
+- `body` - Request body
+
+#### URL API
+
+The `URL` interface provides full URL parsing and manipulation capabilities:
+
+```javascript
+// Parse and manipulate URLs
+const url = new URL('https://user:pass@example.com:8080/path/to/page?q=test#section');
+
+console.log(url.href);       // "https://user:pass@example.com:8080/path/to/page?q=test#section"
+console.log(url.protocol);   // "https:"
+console.log(url.username);   // "user"
+console.log(url.password);   // "pass"
+console.log(url.hostname);   // "example.com"
+console.log(url.port);       // "8080"
+console.log(url.host);       // "example.com:8080"
+console.log(url.pathname);   // "/path/to/page"
+console.log(url.search);     // "?q=test"
+console.log(url.hash);       // "#section"
+console.log(url.origin);     // "https://example.com:8080"
+
+// Modify URL components
+url.pathname = '/new/path';
+url.search = '?key=value';
+console.log(url.href);       // "https://user:pass@example.com:8080/new/path?key=value"
+
+// Relative URLs with base
+const url2 = new URL('/api/v1', 'https://example.com/path/to/page.html');
+console.log(url2.href);      // "https://example.com/api/v1"
+
+const url3 = new URL('other.html', 'https://example.com/path/to/');
+console.log(url3.href);      // "https://example.com/path/to/other.html"
+```
+
+#### URLSearchParams API
+
+The `URLSearchParams` interface provides utilities for working with query strings:
+
+```javascript
+// Create from string
+const params = new URLSearchParams('?q=hello&count=10');
+console.log(params.get('q'));      // "hello"
+console.log(params.get('count'));  // "10"
+
+// Create from object
+const params2 = new URLSearchParams({ foo: 'bar', baz: 'qux' });
+console.log(params2.toString());   // "foo=bar&baz=qux"
+
+// Create from array
+const params3 = new URLSearchParams([['a', '1'], ['b', '2']]);
+console.log(params3.toString());   // "a=1&b=2"
+
+// Manipulate parameters
+params.append('filter', 'active');
+params.set('q', 'world');
+params.delete('count');
+console.log(params.toString());    // "q=world&filter=active"
+
+// Check existence
+console.log(params.has('q'));      // true
+
+// Get all values for a key
+params.append('color', 'red');
+params.append('color', 'blue');
+console.log(params.getAll('color')); // ["red", "blue"]
+
+// Iterate
+params.forEach((value, key) => {
+  console.log(`${key} = ${value}`);
+});
+
+// Sort parameters
+params.sort();
+
+// Get parameter count
+console.log(params.size);          // Number of parameters
+```
+
+**Integration with URL:**
+
+The `URL.searchParams` property is bidirectionally linked to the `URL.search` property:
+
+```javascript
+const url = new URL('https://example.com');
+
+// Modifying searchParams updates the URL
+url.searchParams.append('foo', 'bar');
+console.log(url.href);  // "https://example.com/?foo=bar"
+
+// Modifying search updates searchParams
+url.search = '?new=value';
+console.log(url.searchParams.get('new'));  // "value"
+```
+
+#### Headers API
+
+The `Headers` interface provides a way to manipulate HTTP headers:
+
+```javascript
+// Create from object
+const headers = new Headers({
+  'Content-Type': 'application/json',
+  'Accept': 'application/json'
+});
+
+// Create from array
+const headers2 = new Headers([
+  ['Content-Type', 'text/html'],
+  ['Accept', 'text/plain']
+]);
+
+// Manipulate headers
+headers.append('X-Custom-Header', 'value');
+headers.set('Content-Type', 'text/plain');
+headers.delete('Accept');
+
+// Check and retrieve
+console.log(headers.get('Content-Type'));  // "text/plain"
+console.log(headers.has('X-Custom-Header')); // true
+
+// Iterate
+headers.forEach((value, name) => {
+  console.log(`${name}: ${value}`);
+});
+
+for (const [name, value] of headers.entries()) {
+  console.log(`${name}: ${value}`);
+}
 ```
 
 ### Limitations
