@@ -250,6 +250,52 @@ For quickjs-ruby, **Option 2 (JavaScript Polyfill Layer)** is recommended becaus
 - If async is needed, evaluate adding libuv
 - This is a significant undertaking
 
+## Implementation Status
+
+**Option 2 has been implemented.** The following files were added/modified:
+
+### New Files
+- `lib/quickjs/fetch_polyfill.rb` - JavaScript polyfills for Headers, Request, Response
+- `test/fetch_polyfill_test.rb` - Comprehensive test suite (39 tests)
+
+### Modified Files
+- `lib/quickjs.rb` - Added require for fetch_polyfill
+- `lib/quickjs/sandbox.rb` - Inject polyfills on initialization
+- `ext/quickjs/quickjs_ext.c` - Pass response headers from Ruby to JavaScript
+
+### Features Implemented
+- ✅ `Headers` class with case-insensitive header management
+- ✅ `Response` class with `json()`, `text()`, `arrayBuffer()` methods
+- ✅ `Request` class with method normalization and body handling
+- ✅ Fetch wrapper returning proper Response objects
+- ✅ Graceful fallback for low-memory sandboxes (< 150KB)
+- ✅ Full backwards compatibility with existing code
+
+### Usage Example
+
+```javascript
+// Now works with proper Response methods
+var response = fetch('https://api.example.com/data');
+
+// Use standard methods
+var data = response.json();
+console.log(data.name);
+
+// Or access body as text
+var text = response.text();
+
+// Headers work properly
+var contentType = response.headers.get('content-type');
+
+// Create requests with Request objects
+var request = new Request('https://api.example.com/users', {
+  method: 'POST',
+  body: JSON.stringify({ name: 'John' }),
+  headers: new Headers({ 'Content-Type': 'application/json' })
+});
+var response = fetch(request);
+```
+
 ## References
 
 - [txiki.js source code](https://github.com/saghul/txiki.js)
