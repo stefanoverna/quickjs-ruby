@@ -28,7 +28,7 @@ This gem uses the **full QuickJS engine**, not MicroQuickJS. Key differences:
 | ------------------------ | --------------------------- | ------------------------- |
 | **JavaScript Support**   | ES5-ish subset              | Full ES2020+              |
 | **Default Memory Limit** | 50KB                        | 1MB                       |
-| **Minimum Memory**       | 10KB                        | 100KB                     |
+| **Minimum Memory**       | 10KB                        | 300KB                     |
 | **Binary Size**          | Smaller (~500KB)            | Larger (~1.5MB)           |
 | **Memory Footprint**     | Minimal                     | Moderate                  |
 
@@ -41,10 +41,10 @@ This gem uses the **full QuickJS engine**, not MicroQuickJS. Key differences:
 - You need modern JavaScript syntax (ES2020+)
 - You want to run existing JavaScript libraries
 - You need async/await and Promises
-- Memory is not extremely constrained (>1MB available)
+- Memory is not extremely constrained (>300KB available)
 
 **When to use MicroQuickJS:**
-- Extreme memory constraints (<100KB)
+- Extreme memory constraints (<300KB)
 - Only need basic JavaScript operations
 - Want smallest possible footprint
 - Targeting embedded systems
@@ -313,7 +313,7 @@ puts result.value
 ```ruby
 # Default limits
 sandbox = QuickJS::Sandbox.new(
-  memory_limit: 1_000_000,  # 1MB (default, minimum: 100KB)
+  memory_limit: 1_000_000,  # 1MB (default, minimum: 300KB)
   timeout_ms: 5000           # 5 seconds (default)
 )
 
@@ -332,7 +332,7 @@ rescue QuickJS::TimeoutError => e
 end
 ```
 
-**Important:** QuickJS requires **at least 100KB** to initialize (vs 10KB for MicroQuickJS). Use 1MB+ for real-world scripts.
+**Important:** QuickJS requires **at least 300KB** to initialize (includes fetch polyfills). Use 1MB+ for real-world scripts.
 
 ### Console Output
 
@@ -659,7 +659,7 @@ const data = await fetch(url).then(r => r.json())
 
 ### Memory Safety
 
-**Fixed Memory Allocation:** QuickJS is initialized with a fixed memory limit (default: 1MB, minimum: 100KB). The JavaScript heap cannot grow beyond this limit.
+**Fixed Memory Allocation:** QuickJS is initialized with a fixed memory limit (default: 1MB, minimum: 300KB). The JavaScript heap cannot grow beyond this limit.
 
 ```ruby
 sandbox = QuickJS::Sandbox.new(memory_limit: 500_000)  # 500KB
@@ -1007,7 +1007,7 @@ Raised when JavaScript execution exceeds the configured memory limit.
 
 ```ruby
 begin
-  sandbox = QuickJS::Sandbox.new(memory_limit: 100_000)  # 100KB
+  sandbox = QuickJS::Sandbox.new(memory_limit: 300_000)  # 300KB (minimum)
   sandbox.eval(<<~JS)
     console.log("Allocating large array...");
     const huge = new Array(1000000);  // Too large
@@ -1121,7 +1121,7 @@ One-shot JavaScript evaluation. Creates a sandbox, runs code, and destroys sandb
 **Parameters:**
 - `code` (String) - JavaScript code to execute
 - `options` (Hash) - Optional configuration:
-  - `memory_limit` (Integer) - Memory limit in bytes (default: 1,000,000, min: 100,000)
+  - `memory_limit` (Integer) - Memory limit in bytes (default: 1,000,000, min: 300,000)
   - `timeout_ms` (Integer) - Timeout in milliseconds (default: 5,000)
   - `console_log_max_size` (Integer) - Console output limit (default: 10,000)
   - `http` (Hash) - HTTP configuration (see below)
@@ -1249,7 +1249,7 @@ rake benchmark
 3. **Use appropriate memory limits:**
    ```ruby
    # Small scripts: use minimal memory
-   QuickJS::Sandbox.new(memory_limit: 100_000)  # 100KB
+   QuickJS::Sandbox.new(memory_limit: 300_000)  # 300KB (minimum)
 
    # Complex operations: allocate more
    QuickJS::Sandbox.new(memory_limit: 5_000_000)  # 5MB

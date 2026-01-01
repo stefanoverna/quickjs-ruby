@@ -69,7 +69,7 @@ This gem wraps the **full QuickJS engine**, not MicroQuickJS. Key differences:
 
 1. **Memory Requirements**: QuickJS requires more memory than MicroQuickJS
    - Default memory limit: 1MB (vs 50KB for MicroQuickJS)
-   - Minimum recommended: 100KB (vs 10KB for MicroQuickJS)
+   - Minimum required: 300KB (includes fetch polyfills) (vs 10KB for MicroQuickJS)
 
 2. **Features**: Full QuickJS includes:
    - BigInt support
@@ -80,7 +80,7 @@ This gem wraps the **full QuickJS engine**, not MicroQuickJS. Key differences:
 
 ### Memory Errors on Simple Scripts
 
-If simple scripts like `1 + 1` fail with errors, the memory limit is too low. QuickJS needs at least 100KB to initialize properly.
+If simple scripts like `1 + 1` fail with errors, the memory limit is too low. QuickJS needs at least 300KB to initialize properly (includes fetch polyfills).
 
 ### Build Errors
 

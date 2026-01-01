@@ -86,10 +86,10 @@ class TestQuickJS < Minitest::Test
       }
     JS
 
-    # This should fail with small memory limit (QuickJS stdlib needs ~100KB minimum)
+    # This should fail with small memory limit (QuickJS stdlib needs ~300KB minimum with polyfills)
     # Note: QuickJS requires more memory than MicroQuickJS
     begin
-      QuickJS.eval(code, memory_limit: 150_000) # Small but valid limit
+      QuickJS.eval(code, memory_limit: 350_000) # Small but valid limit
       # If it doesn't raise, that's ok - QuickJS might handle it gracefully
     rescue QuickJS::MemoryLimitError, QuickJS::JavascriptError
       # Expected - either out of memory or JS error
@@ -97,21 +97,21 @@ class TestQuickJS < Minitest::Test
   end
 
   def test_memory_limit_validation
-    # memory_limit cannot be less than 100000 bytes (required for QuickJS stdlib initialization)
+    # memory_limit cannot be less than 300000 bytes (required for QuickJS stdlib initialization with polyfills)
     error = assert_raises(QuickJS::ArgumentError) do
-      QuickJS::Sandbox.new(memory_limit: 50_000)
+      QuickJS::Sandbox.new(memory_limit: 250_000)
     end
-    assert_match(/memory_limit cannot be less than 100000/i, error.message)
-    assert_match(/50000/, error.message)
+    assert_match(/memory_limit cannot be less than 300000/i, error.message)
+    assert_match(/250000/, error.message)
 
-    # Should work with exactly 100000
-    sandbox = QuickJS::Sandbox.new(memory_limit: 100_000)
+    # Should work with exactly 300000
+    sandbox = QuickJS::Sandbox.new(memory_limit: 300_000)
     result = sandbox.eval("2 + 2")
 
     assert_equal 4, result.value
 
-    # Should work with more than 100000
-    sandbox = QuickJS::Sandbox.new(memory_limit: 200_000)
+    # Should work with more than 300000
+    sandbox = QuickJS::Sandbox.new(memory_limit: 400_000)
     result = sandbox.eval("2 + 2")
 
     assert_equal 4, result.value
@@ -223,7 +223,7 @@ class TestQuickJS < Minitest::Test
   end
 
   def test_custom_memory_limit
-    sandbox = QuickJS::Sandbox.new(memory_limit: 100_000)
+    sandbox = QuickJS::Sandbox.new(memory_limit: 500_000)
     result = sandbox.eval("1 + 1")
 
     assert_equal 2, result.value
