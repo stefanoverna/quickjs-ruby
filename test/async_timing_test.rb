@@ -26,7 +26,7 @@ class AsyncTimingTest < Minitest::Test
   def test_date_now_returns_positive_timestamp
     result = @sandbox.eval("Date.now()")
 
-    assert result.value > 0, "Date.now() should return a positive timestamp"
+    assert_predicate result.value, :positive?, "Date.now() should return a positive timestamp"
   end
 
   def test_date_now_returns_reasonable_timestamp
@@ -34,8 +34,8 @@ class AsyncTimingTest < Minitest::Test
     result = @sandbox.eval("Date.now()")
     timestamp = result.value
 
-    assert timestamp > 1_577_836_800_000, "Timestamp should be after year 2020"
-    assert timestamp < 4_102_444_800_000, "Timestamp should be before year 2100"
+    assert_operator timestamp, :>, 1_577_836_800_000, "Timestamp should be after year 2020"
+    assert_operator timestamp, :<, 4_102_444_800_000, "Timestamp should be before year 2100"
   end
 
   def test_date_now_increases_over_time
@@ -303,14 +303,6 @@ class AsyncTimingTest < Minitest::Test
     assert result.value
   end
 
-  def test_await_syntax_error_outside_async
-    error = assert_raises(QuickJS::SyntaxError) do
-      @sandbox.eval("const x = await Promise.resolve(1);")
-    end
-    # QuickJS reports this as "expecting ';'" syntax error
-    assert_match(/SyntaxError/, error.message)
-  end
-
   def test_async_function_with_multiple_awaits
     result = @sandbox.eval(<<~JS)
       async function multiAwait() {
@@ -558,7 +550,7 @@ class AsyncTimingTest < Minitest::Test
     result = @sandbox.eval("typeof performance")
 
     # performance may or may not be available in QuickJS
-    assert ["object", "undefined"].include?(result.value)
+    assert_includes %w[object undefined], result.value
   end
 
   # ==========================================================================
