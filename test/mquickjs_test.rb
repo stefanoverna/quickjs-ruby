@@ -367,4 +367,81 @@ class TestQuickJS < Minitest::Test
     assert_operator error.console_output.bytesize, :<=, 50
     assert_predicate error, :console_truncated?
   end
+
+  def test_console_output_utf8_encoding
+    result = QuickJS.eval("console.log('Hello 世界 🌍'); console.log('Café')")
+
+    assert_equal "Hello 世界 🌍\nCafé\n", result.console_output
+    # Verify the encoding is UTF-8, not ASCII-8BIT
+    assert_equal "UTF-8", result.console_output.encoding.name
+    # This should work - serialize to JSON (fails with ASCII-8BIT encoding)
+    json = JSON.generate({ output: result.console_output })
+
+    assert_equal '{"output":"Hello 世界 🌍\nCafé\n"}', json
+  end
+
+  def test_unicode_string_operations
+    code = <<~JS
+      // QuickJS string methods work with full Unicode, not just ASCII
+      console.log('--- Unicode Case Conversion ---');
+
+      // German: ß to SS (uppercase) and back
+      const german = 'Maße Straße';
+      const germanUpper = german.toUpperCase();
+      const germanLower = germanUpper.toLowerCase();
+      console.log('German:', german, '-> Upper:', germanUpper, '-> Lower:', germanLower);
+
+      // Greek: Full case conversion
+      const greek = 'Γειά Σου Κόσμε';
+      const greekLower = greek.toLowerCase();
+      const greekUpper = greekLower.toUpperCase();
+      console.log('Greek:', greek, '-> Lower:', greekLower, '-> Upper:', greekUpper);
+
+      // Cyrillic: Russian text
+      const cyrillic = 'Привет Мир';
+      const cyrillicLower = cyrillic.toLowerCase();
+      const cyrillicUpper = cyrillicLower.toUpperCase();
+      console.log('Cyrillic:', cyrillic, '-> Lower:', cyrillicLower);
+
+      // Turkish: Special i/I dot handling (depends on locale)
+      const turkish = 'Istanbul';
+      const turkishLower = turkish.toLowerCase();
+      console.log('Turkish:', turkish, '-> Lower:', turkishLower);
+
+      // Other string operations work with Unicode too
+      console.log('--- Other String Operations ---');
+
+      // Includes with Unicode
+      const original = 'Hello 🌍 World';
+      const hasEmoji = original.includes('🌍');
+      console.log('Has emoji?', hasEmoji);
+
+      // Split and join with Unicode
+      const parts = 'café naïve résumé'.split(' ');
+      console.log('Split:', parts);
+      const joined = parts.join('-');
+      console.log('Joined:', joined);
+
+      // String length with emoji
+      const emojiString = '😀😃😄😁';
+      console.log('Emoji string length:', emojiString.length);
+
+      ({
+        german: { original: german, upper: germanUpper, lower: germanLower },
+        greek: { original: greek, lower: greekLower, upper: greekUpper },
+        cyrillic: { original: cyrillic, lower: cyrillicLower },
+        hasEmoji,
+        emojiLength: emojiString.length
+      });
+    JS
+
+    result = QuickJS.eval(code)
+
+    # Verify the encoding is UTF-8, not ASCII-8BIT
+    assert_equal "UTF-8", result.console_output.encoding.name
+    # This should work - serialize to JSON (fails with ASCII-8BIT encoding)
+    json = JSON.generate({ output: result.console_output, value: result.value })
+    # Just verify it can be serialized to JSON without error
+    assert_kind_of String, json
+  end
 end

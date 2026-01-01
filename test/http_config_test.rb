@@ -248,5 +248,3 @@ class TestHTTPConfig < Minitest::Test
     assert config.allowed?("https://example.com/test")
   end
 end
-
-puts "Running HTTP configuration tests..."

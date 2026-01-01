@@ -94,5 +94,3 @@ class TestHTTPExecutor < Minitest::Test
     assert_equal 200, hash[:status]
   end
 end
-
-puts "Running HTTP executor tests..."

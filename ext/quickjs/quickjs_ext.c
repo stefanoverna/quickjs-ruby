@@ -698,6 +698,7 @@ static VALUE sandbox_eval(VALUE self, VALUE code) {
 
     // Prepare console output for all return paths
     VALUE console_output = rb_str_new(wrapper->console_output, wrapper->console_output_len);
+    rb_enc_associate(console_output, rb_utf8_encoding());
     VALUE console_truncated = wrapper->console_truncated ? Qtrue : Qfalse;
 
     // Check for timeout
